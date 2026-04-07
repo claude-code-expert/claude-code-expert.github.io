@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Code Expert — AI와 함께하는 개발</title>
+  <meta name="description" content="클로드 코드 마스터 (한빛미디어) — 설계부터 배포까지, AI와 함께하는 개발. 공식 GitHub 조직 랜딩 페이지.">
+  <meta property="og:title" content="Claude Code Expert">
+  <meta property="og:description" content="AI와 함께하는 개발 — 원칙, 방법론, 그리고 실전 코드">
+  <meta property="og:image" content="https://raw.githubusercontent.com/claude-code-expert/.github/main/profile/assets/banner.png">
+  <meta property="og:url" content="https://claude-code-expert.github.io">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #05070e;
+      --bg2: #0a0e1a;
+      --surface: #0f1525;
+      --surface2: #151d30;
+      --surface3: #1a2440;
+      --border: #1a2240;
+      --border-hover: #2a3660;
+      --text: #e4e8f1;
+      --text-secondary: #a0aec0;
+      --text-muted: #5a6a8a;
+      --accent: #38bdf8;
+      --accent-dim: #1e6ea0;
+      --green: #34d399;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --violet: #a78bfa;
+      --teal: #2dd4bf;
+      --radius: 14px;
+      --radius-lg: 22px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Noto Sans KR', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.75;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: inherit; }
+
+    /* ── Backgrounds ── */
+    .bg-grid {
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(56, 189, 248, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56, 189, 248, 0.025) 1px, transparent 1px);
+      background-size: 64px 64px;
+      pointer-events: none; z-index: 0;
+    }
+
+    .bg-orb {
+      position: fixed; border-radius: 50%; filter: blur(140px);
+      pointer-events: none; z-index: 0;
+    }
+
+    .bg-orb--1 {
+      width: 700px; height: 700px; top: -250px; left: -150px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.10), transparent 70%);
+    }
+
+    .bg-orb--2 {
+      width: 500px; height: 500px; bottom: 30%; right: -150px;
+      background: radial-gradient(circle, rgba(167, 139, 250, 0.07), transparent 70%);
+    }
+
+    .bg-orb--3 {
+      width: 400px; height: 400px; bottom: -100px; left: 20%;
+      background: radial-gradient(circle, rgba(52, 211, 153, 0.06), transparent 70%);
+    }
+
+    /* ── Layout ── */
+    .wrap {
+      position: relative; z-index: 1;
+      max-width: 1140px; margin: 0 auto; padding: 0 28px;
+    }
+
+    section { padding: 88px 0; }
+
+    .divider {
+      border: none; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 16px 0;
+      background: rgba(5, 7, 14, 0.75);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(26, 34, 64, 0.5);
+    }
+
+    .nav__inner {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .nav__brand {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 1.1rem; letter-spacing: -0.02em;
+      text-decoration: none; color: var(--text);
+    }
+
+    .nav__brand span { color: var(--accent); }
+
+    .nav__links { display: flex; gap: 8px; }
+
+    .nav__link {
+      padding: 6px 14px; border-radius: 8px;
+      font-size: 0.85rem; font-weight: 500;
+      text-decoration: none; color: var(--text-secondary);
+      transition: all 0.15s ease;
+    }
+
+    .nav__link:hover { background: var(--surface); color: var(--text); }
+
+    .nav__gh {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 16px; border-radius: 8px;
+      background: var(--surface); border: 1px solid var(--border);
+      font-size: 0.85rem; font-weight: 500;
+      text-decoration: none; color: var(--text-secondary);
+      transition: all 0.15s ease;
+    }
+
+    .nav__gh:hover { border-color: var(--border-hover); color: var(--text); }
+
+    .nav__gh svg { width: 16px; height: 16px; }
+
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh; display: flex; align-items: center;
+      padding-top: 80px;
+    }
+
+    .hero__inner { width: 100%; text-align: center; }
+
+    .hero__badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 7px 18px; border-radius: 100px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem; color: var(--accent);
+      margin-bottom: 36px;
+      opacity: 0; animation: fadeUp 0.6s ease forwards;
+    }
+
+    .hero__badge::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .hero__title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(3rem, 7vw, 5rem);
+      line-height: 1.08; letter-spacing: -0.035em;
+      margin-bottom: 10px;
+      opacity: 0; animation: fadeUp 0.6s 0.08s ease forwards;
+    }
+
+    .hero__title span {
+      background: linear-gradient(135deg, var(--accent) 0%, #818cf8 45%, var(--rose) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero__sub {
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: clamp(1.2rem, 2.5vw, 1.7rem);
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      opacity: 0; animation: fadeUp 0.6s 0.16s ease forwards;
+    }
+
+    .hero__desc {
+      max-width: 640px; margin: 0 auto 40px;
+      font-size: 1.05rem; color: var(--text-muted);
+      opacity: 0; animation: fadeUp 0.6s 0.24s ease forwards;
+    }
+
+    .hero__actions {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;
+      margin-bottom: 56px;
+      opacity: 0; animation: fadeUp 0.6s 0.32s ease forwards;
+    }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 13px 28px; border-radius: 11px;
+      font-family: 'Noto Sans KR', sans-serif; font-weight: 600; font-size: 0.95rem;
+      text-decoration: none; border: none; cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn--primary {
+      background: var(--accent); color: #050a15;
+    }
+
+    .btn--primary:hover {
+      background: #7dd3fc; transform: translateY(-2px);
+      box-shadow: 0 10px 40px rgba(56, 189, 248, 0.2);
+    }
+
+    .btn--outline {
+      background: transparent; color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .btn--outline:hover {
+      border-color: var(--border-hover); color: var(--text); background: var(--surface);
+    }
+
+    /* ── Section Header ── */
+    .sh { margin-bottom: 52px; }
+    .sh--center { text-align: center; }
+
+    .sh__label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.73rem; text-transform: uppercase;
+      letter-spacing: 0.16em; color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .sh__title {
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: clamp(1.7rem, 3.5vw, 2.4rem);
+      letter-spacing: -0.02em;
+    }
+
+    .sh__desc {
+      color: var(--text-muted); margin-top: 10px;
+      max-width: 560px;
+    }
+
+    .sh--center .sh__desc { margin-left: auto; margin-right: auto; }
+
+    /* ── Book Parts ── */
+    .parts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+    .part {
+      padding: 28px; border-radius: var(--radius);
+      border: 1px solid var(--border); background: var(--surface);
+      transition: all 0.25s ease;
+    }
+
+    .part:hover { border-color: var(--border-hover); transform: translateY(-3px); }
+
+    .part__num {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 2.4rem; line-height: 1;
+      margin-bottom: 12px;
+    }
+
+    .part:nth-child(1) .part__num { color: var(--accent); }
+    .part:nth-child(2) .part__num { color: var(--violet); }
+    .part:nth-child(3) .part__num { color: var(--rose); }
+
+    .part__title { font-weight: 700; font-size: 1.05rem; margin-bottom: 8px; }
+
+    .part__desc { color: var(--text-muted); font-size: 0.88rem; line-height: 1.65; }
+
+    /* ── Repo Cards ── */
+    .repo-section { margin-bottom: 28px; }
+
+    .repo-section__label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem; text-transform: uppercase;
+      letter-spacing: 0.12em; color: var(--text-muted);
+      padding-bottom: 10px; margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .repo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+    }
+
+    .repo {
+      position: relative; padding: 26px;
+      border-radius: var(--radius); border: 1px solid var(--border);
+      background: var(--surface);
+      text-decoration: none; color: var(--text);
+      display: flex; flex-direction: column;
+      transition: all 0.25s ease; overflow: hidden;
+    }
+
+    .repo::after {
+      content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 2px; opacity: 0; transition: opacity 0.25s ease;
+    }
+
+    .repo:hover {
+      border-color: var(--border-hover); transform: translateY(-3px);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+    }
+
+    .repo:hover::after { opacity: 1; }
+
+    .repo[data-color="accent"]::after { background: var(--accent); }
+    .repo[data-color="violet"]::after { background: var(--violet); }
+    .repo[data-color="green"]::after { background: var(--green); }
+    .repo[data-color="amber"]::after { background: var(--amber); }
+    .repo[data-color="rose"]::after { background: var(--rose); }
+    .repo[data-color="teal"]::after { background: var(--teal); }
+
+    .repo__head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .repo__name {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600; font-size: 1rem;
+    }
+
+    .repo__arrow {
+      color: var(--text-muted); font-size: 1.1rem;
+      transition: all 0.2s ease;
+    }
+
+    .repo:hover .repo__arrow { color: var(--accent); transform: translate(2px, -2px); }
+
+    .repo__desc {
+      color: var(--text-secondary); font-size: 0.88rem;
+      line-height: 1.6; flex: 1; margin-bottom: 16px;
+    }
+
+    .repo__tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .repo__tag {
+      padding: 3px 10px; border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem; font-weight: 500;
+      background: var(--bg2); color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .repo__links {
+      display: flex; gap: 8px; margin-top: 12px; padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .repo__link {
+      padding: 4px 12px; border-radius: 6px;
+      font-size: 0.78rem; font-weight: 500;
+      text-decoration: none; color: var(--accent);
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.15);
+      transition: all 0.15s ease;
+    }
+
+    .repo__link:hover { background: rgba(56, 189, 248, 0.15); }
+
+    .repo__link--green {
+      color: var(--green);
+      background: rgba(52, 211, 153, 0.08);
+      border-color: rgba(52, 211, 153, 0.15);
+    }
+
+    .repo__link--green:hover { background: rgba(52, 211, 153, 0.15); }
+
+    /* ── Image Showcase ── */
+    .showcase {
+      margin-top: 24px;
+      border-radius: var(--radius); overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .showcase img {
+      width: 100%; display: block;
+      transition: transform 0.4s ease;
+    }
+
+    .showcase:hover img { transform: scale(1.015); }
+
+    .showcase__caption {
+      text-align: center; padding: 10px 16px;
+      background: var(--surface);
+      font-size: 0.82rem; color: var(--text-muted);
+    }
+
+    /* ── Authors ── */
+    .authors { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 20px; }
+
+    .author {
+      padding: 32px; border-radius: var(--radius-lg);
+      border: 1px solid var(--border); background: var(--surface);
+    }
+
+    .author__name {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700; font-size: 1.2rem; margin-bottom: 3px;
+    }
+
+    .author__role {
+      font-size: 0.88rem; font-weight: 500;
+      color: var(--accent); margin-bottom: 14px;
+    }
+
+    .author__bio {
+      color: var(--text-muted); font-size: 0.88rem;
+      line-height: 1.7; margin-bottom: 18px;
+    }
+
+    .author__links { display: flex; gap: 8px; }
+
+    .author__link {
+      padding: 6px 16px; border-radius: 8px;
+      font-size: 0.82rem; font-weight: 500;
+      text-decoration: none; color: var(--text-secondary);
+      border: 1px solid var(--border);
+      transition: all 0.15s ease;
+    }
+
+    .author__link:hover {
+      border-color: var(--border-hover); color: var(--text);
+    }
+
+    /* ── Quote ── */
+    .quote-block {
+      text-align: center; padding: 64px 24px;
+    }
+
+    .quote-block__text {
+      font-family: 'Syne', sans-serif; font-weight: 600;
+      font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+      color: var(--text-secondary); font-style: italic;
+      max-width: 700px; margin: 0 auto 20px;
+    }
+
+    .quote-block__sub {
+      font-size: 0.88rem; color: var(--text-muted);
+    }
+
+    /* ── Footer ── */
+    footer {
+      padding: 40px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer__inner {
+      display: flex; flex-wrap: wrap; justify-content: space-between;
+      align-items: center; gap: 16px;
+    }
+
+    .footer__copy {
+      font-size: 0.82rem; color: var(--text-muted);
+    }
+
+    .footer__copy a {
+      text-decoration: none; color: var(--text-secondary);
+    }
+
+    .footer__copy a:hover { color: var(--accent); }
+
+    .footer__links { display: flex; gap: 20px; }
+
+    .footer__links a {
+      font-size: 0.82rem; text-decoration: none;
+      color: var(--text-muted); transition: color 0.15s;
+    }
+
+    .footer__links a:hover { color: var(--text); }
+
+    /* ── Repo Stats (star / fork) ── */
+    .repo__stats {
+      display: flex; gap: 12px; margin-bottom: 14px;
+    }
+
+    .repo__stat {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem; font-weight: 500;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+
+    .repo__stat svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    .repo__stat--star {
+      color: var(--amber); background: rgba(251, 191, 36, 0.08);
+      border: 1px solid rgba(251, 191, 36, 0.15);
+    }
+
+    .repo__stat--star:hover {
+      background: rgba(251, 191, 36, 0.18);
+      transform: translateY(-1px);
+    }
+
+    .repo__stat--fork {
+      color: var(--text-secondary); background: var(--bg2);
+      border: 1px solid var(--border);
+    }
+
+    .repo__stat--fork:hover {
+      background: var(--surface2);
+      transform: translateY(-1px);
+    }
+
+    .repo__lang {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 0.75rem; color: var(--text-muted);
+    }
+
+    .repo__lang-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+
+    .repo__meta {
+      display: flex; align-items: center; gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .repo__updated {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem; color: var(--text-muted);
+    }
+
+    /* ── Loading ���─ */
+    .repo-loading {
+      display: flex; align-items: center; justify-content: center;
+      gap: 12px; padding: 60px 0;
+      color: var(--text-muted); font-size: 0.9rem;
+    }
+
+    .repo-loading__spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .repo-error {
+      text-align: center; padding: 48px 0;
+      color: var(--text-muted); font-size: 0.9rem;
+    }
+
+    .repo-error a {
+      color: var(--accent); text-decoration: none;
+    }
+
+    /* ── Animation ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .reveal {
+      opacity: 0; transform: translateY(22px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+
+    .reveal.vis { opacity: 1; transform: translateY(0); }
+
+    /* ── Responsive ── */
+    @media (max-width: 860px) {
+      section { padding: 60px 0; }
+      .hero { min-height: auto; padding-top: 100px; padding-bottom: 40px; }
+      .parts { grid-template-columns: 1fr; }
+      .repo-grid { grid-template-columns: 1fr; }
+      .authors { grid-template-columns: 1fr; }
+      .nav__links { display: none; }
+    }
+
+    @media (max-width: 480px) {
+      .wrap { padding: 0 18px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-orb bg-orb--1"></div>
+<div class="bg-orb bg-orb--2"></div>
+<div class="bg-orb bg-orb--3"></div>
+
+<!-- Nav -->
+<nav>
+  <div class="wrap nav__inner">
+    <a href="/" class="nav__brand"><span>Claude Code</span> Expert</a>
+    <div class="nav__links">
+      <a href="#book" class="nav__link">책 소개</a>
+      <a href="#repos" class="nav__link">레포지토리</a>
+      <a href="#authors" class="nav__link">저자</a>
+    </div>
+    <a href="https://github.com/claude-code-expert" class="nav__gh">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="wrap">
+    <div class="hero__inner">
+      <div class="hero__badge">한빛미디어 &middot; 2026.04.15 출간</div>
+      <h1 class="hero__title"><span>Claude Code Expert</span></h1>
+      <p class="hero__sub">AI와 함께하는 개발 — 원칙, 방법론, 그리고 실전 코드</p>
+      <p class="hero__desc">
+        단순한 도구 사용법이 아닌, AI 코딩 에이전트와 체계적으로 협업하는 방법론을 제시합니다.
+        도구는 바뀌어도 원칙은 변하지 않습니다.
+      </p>
+      <div class="hero__actions">
+        <a href="#repos" class="btn btn--primary">레포지토리 둘러보기</a>
+        <a href="https://github.com/claude-code-expert" class="btn btn--outline">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub Organization
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- Book -->
+<section id="book">
+  <div class="wrap">
+    <div class="sh sh--center reveal">
+      <div class="sh__label">Book Overview</div>
+      <h2 class="sh__title">책 구성</h2>
+      <p class="sh__desc">이론에서 실전으로, 기초에서 심화로 이어지는 3개 파트</p>
+    </div>
+    <div class="parts">
+      <div class="part reveal">
+        <div class="part__num">01</div>
+        <div class="part__title">시작하기 전에</div>
+        <div class="part__desc">개발자 패러다임 전환, Claude Code 설정, AI 협업 방법론 (TDD, SDD, MCP)</div>
+      </div>
+      <div class="part reveal">
+        <div class="part__num">02</div>
+        <div class="part__title">기초편</div>
+        <div class="part__desc">풀스택 TODO 앱 (Tika) — 요건 정의 &rarr; 설계 &rarr; 개발 &rarr; 테스트 &rarr; 배포</div>
+      </div>
+      <div class="part reveal">
+        <div class="part__num">03</div>
+        <div class="part__title">중급편</div>
+        <div class="part__desc">AWS Bedrock AI 챗봇 — 스트리밍, 컨텍스트 관리, Tool Use, 할루시네이션 대응</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- Repositories -->
+<section id="repos">
+  <div class="wrap">
+    <div class="sh reveal">
+      <div class="sh__label">Repositories</div>
+      <h2 class="sh__title">프로젝트</h2>
+      <p class="sh__desc">책의 예제 프로젝트부터 오픈소스 사이드 프로젝트까지</p>
+    </div>
+
+    <!-- Dynamic repo sections rendered by JS -->
+    <div id="repo-container">
+      <div class="repo-loading">
+        <div class="repo-loading__spinner"></div>
+        <span>GitHub에서 레포지토리 정보를 불러오는 중...</span>
+      </div>
+    </div>
+
+    <!-- Tika Showcase -->
+    <div class="reveal" style="margin-top: 32px;">
+      <div class="showcase">
+        <img src="https://raw.githubusercontent.com/claude-code-expert/.github/main/profile/assets/tika_main.png" alt="Tika 칸반 보드 메인" loading="lazy">
+        <div class="showcase__caption">Tika — 칸반 보드 메인 화면</div>
+      </div>
+    </div>
+
+    <!-- Brewnet Showcase -->
+    <div class="reveal" style="margin-top: 48px;">
+      <div class="showcase">
+        <img src="https://raw.githubusercontent.com/claude-code-expert/.github/main/profile/assets/brewnet-web.png" alt="Brewnet 웹사이트" loading="lazy">
+        <div class="showcase__caption">Brewnet — 셀프호스팅 홈 서버 자동 구축 도구</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- Authors -->
+<section id="authors">
+  <div class="wrap">
+    <div class="sh sh--center reveal">
+      <div class="sh__label">Authors</div>
+      <h2 class="sh__title">저자</h2>
+    </div>
+    <div class="authors">
+      <div class="author reveal">
+        <div class="author__name">이남희 (Namhee Lee)</div>
+        <div class="author__role">카카오 서버 개발자</div>
+        <div class="author__bio">
+          20년 경력의 소프트웨어 엔지니어. 쿠팡 주문/배송 MSA, LF·카카오 엔지니어링 리더를 거쳐 AI 코딩 도구의 잠재력을 보고 핸즈온 개발로 복귀.
+          2024년 한빛미디어 『개발자 기술면접 노트』 출간. 사이드 프로젝트 Q-Note, Brewnet 운영 중.
+        </div>
+        <div class="author__links">
+          <a href="https://github.com/villainscode" class="author__link">GitHub</a>
+          <a href="mailto:villainscode@gmail.com" class="author__link">Email</a>
+        </div>
+      </div>
+      <div class="author reveal">
+        <div class="author__name">백승현 (Seunghyun Baek)</div>
+        <div class="author__role">디스패치(Dispatch) CTO</div>
+        <div class="author__bio">
+          한국·일본 20년 이상 경력. 닛산, 미즈호은행 등 대규모 엔터프라이즈 시스템 경험. 2014년부터 디스패치 CTO로 AWS 클라우드 도입 주도, 수천만 동시접속 트래픽 아키텍처 설계, 인프라 비용 70% 절감. 2013년 공개 SW 개발자 대회 금상.
+        </div>
+        <div class="author__links">
+          <a href="mailto:pekuid@gmail.com" class="author__link">Email</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- Quote -->
+<div class="quote-block reveal">
+  <p class="quote-block__text">"도구는 바뀌어도 원칙은 변하지 않는다."</p>
+  <p class="quote-block__sub">— Claude Code Expert</p>
+</div>
+
+<!-- Footer -->
+<footer>
+  <div class="wrap">
+    <div class="footer__inner">
+      <div class="footer__copy">
+        &copy; 2026 <a href="https://github.com/claude-code-expert">Claude Code Expert</a> &middot; 한빛미디어
+      </div>
+      <div class="footer__links">
+        <a href="https://github.com/claude-code-expert">GitHub</a>
+        <a href="https://www.brewnet.dev">Brewnet</a>
+        <a href="https://tika-app.vercel.app">Tika</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ── Scroll Reveal ──
+  function initReveal() {
+    const els = document.querySelectorAll('.reveal:not(.vis)');
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          e.target.style.transitionDelay = `${Math.min(i * 50, 300)}ms`;
+          e.target.classList.add('vis');
+          obs.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+    els.forEach(el => obs.observe(el));
+  }
+
+  // ── Language Colors (GitHub standard) ──
+  const LANG_COLORS = {
+    'TypeScript': '#3178c6', 'JavaScript': '#f1e05a', 'Java': '#b07219',
+    'Python': '#3572A5', 'Go': '#00ADD8', 'Rust': '#dea584',
+    'Shell': '#89e051', 'HTML': '#e34c26', 'CSS': '#563d7c',
+    'Markdown': '#083fa1', 'Kotlin': '#A97BFF', 'Dockerfile': '#384d54',
+  };
+
+  // ── Repo Extra Config (links, category, color) ──
+  const REPO_CONFIG = {
+    'example':             { category: 'book', color: 'accent', links: [
+      { label: 'Pages', url: 'https://claude-code-expert.github.io/example/' },
+      { label: 'Cheatsheet', url: 'https://claude-code-expert.github.io/example/guide/claude-code-cheatsheet-ko.html', green: true },
+    ]},
+    'tika':                { category: 'book', color: 'violet', links: [
+      { label: 'Demo', url: 'https://tika-app.vercel.app/login' },
+    ]},
+    'todo-app':            { category: 'book', color: 'green', links: [
+      { label: 'Demo', url: 'https://ticket-kanban.vercel.app' },
+    ]},
+    'chatbot':             { category: 'book', color: 'rose' },
+    'subagents':           { category: 'book', color: 'amber' },
+    'brewnet':             { category: 'oss', color: 'teal', links: [
+      { label: 'Website', url: 'https://www.brewnet.dev' },
+    ]},
+    'brewnet-boilerplate': { category: 'oss', color: 'green' },
+    'nodejs':              { category: 'starter', color: 'green' },
+    'java-spring-boot':    { category: 'starter', color: 'amber' },
+  };
+
+  const CATEGORIES = [
+    { key: 'book',    label: 'Book Companion Projects' },
+    { key: 'oss',     label: 'Open-Source Side Projects' },
+    { key: 'starter', label: 'Starter Templates' },
+    { key: 'other',   label: 'Other' },
+  ];
+
+  // ── SVG Icons ──
+  const STAR_SVG = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/></svg>';
+  const FORK_SVG = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75v-.878a2.25 2.25 0 111.5 0v.878a2.25 2.25 0 01-2.25 2.25h-1.5v2.128a2.251 2.251 0 11-1.5 0V8.5h-1.5A2.25 2.25 0 013.5 6.25v-.878a2.25 2.25 0 111.5 0zM5 3.25a.75.75 0 10-1.5 0 .75.75 0 001.5 0zm6.75.75a.75.75 0 100-1.5.75.75 0 000 1.5zM8 12.75a.75.75 0 100-1.5.75.75 0 000 1.5z"/></svg>';
+
+  // ── Relative Time ──
+  function timeAgo(dateStr) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const d = Math.floor(diff / 86400000);
+    if (d < 1) return '오늘';
+    if (d < 30) return d + '일 전';
+    if (d < 365) return Math.floor(d / 30) + '개월 전';
+    return Math.floor(d / 365) + '년 전';
+  }
+
+  // ── Build a single repo card ──
+  function buildCard(repo, cfg) {
+    const color = cfg.color || 'accent';
+    const links = cfg.links || [];
+
+    let linksHtml = '';
+    if (links.length) {
+      linksHtml = '<div class="repo__links">' + links.map(l =>
+        `<a href="${l.url}" class="repo__link${l.green ? ' repo__link--green' : ''}" onclick="event.stopPropagation()">${l.label}</a>`
+      ).join('') + '</div>';
+    }
+
+    let langHtml = '';
+    if (repo.language) {
+      const c = LANG_COLORS[repo.language] || '#8b949e';
+      langHtml = `<span class="repo__lang"><span class="repo__lang-dot" style="background:${c}"></span>${repo.language}</span>`;
+    }
+
+    return `
+      <a href="${repo.html_url}" class="repo" data-color="${color}" target="_blank" rel="noopener">
+        <div class="repo__head">
+          <div class="repo__name">${repo.name}</div>
+          <span class="repo__arrow">&nearr;</span>
+        </div>
+        <div class="repo__desc">${repo.description || ''}</div>
+        <div class="repo__stats">
+          <a href="${repo.html_url}/stargazers" class="repo__stat repo__stat--star" onclick="event.stopPropagation()" target="_blank" rel="noopener">
+            ${STAR_SVG} ${repo.stargazers_count}
+          </a>
+          <a href="${repo.html_url}/forks" class="repo__stat repo__stat--fork" onclick="event.stopPropagation()" target="_blank" rel="noopener">
+            ${FORK_SVG} ${repo.forks_count}
+          </a>
+        </div>
+        <div class="repo__meta">
+          ${langHtml}
+          <span class="repo__updated">Updated ${timeAgo(repo.updated_at)}</span>
+        </div>
+        ${linksHtml}
+      </a>`;
+  }
+
+  // ── Main: fetch & render ──
+  async function loadRepos() {
+    const container = document.getElementById('repo-container');
+
+    try {
+      const res = await fetch('https://api.github.com/orgs/claude-code-expert/repos?per_page=100&sort=updated');
+      if (!res.ok) throw new Error(res.status);
+      const repos = await res.json();
+
+      // Categorize
+      const grouped = { book: [], oss: [], starter: [], other: [] };
+      repos.forEach(repo => {
+        if (repo.name === '.github' || repo.name === 'claude-code-expert.github.io') return;
+        const cfg = REPO_CONFIG[repo.name];
+        const cat = cfg ? cfg.category : 'other';
+        grouped[cat].push({ repo, cfg: cfg || {} });
+      });
+
+      // Render
+      let html = '';
+      CATEGORIES.forEach(cat => {
+        const items = grouped[cat.key];
+        if (!items.length) return;
+        html += `
+          <div class="repo-section reveal">
+            <div class="repo-section__label">${cat.label}</div>
+            <div class="repo-grid">
+              ${items.map(({ repo, cfg }) => buildCard(repo, cfg)).join('')}
+            </div>
+          </div>`;
+      });
+
+      container.innerHTML = html;
+      initReveal();
+
+    } catch (err) {
+      container.innerHTML = `
+        <div class="repo-error">
+          GitHub API 요청에 실패했습니다. <br>
+          <a href="https://github.com/claude-code-expert">github.com/claude-code-expert</a>에서 직접 확인해 주세요.
+        </div>`;
+    }
+  }
+
+  // ── Init ──
+  initReveal();
+  loadRepos();
+</script>
+
+</body>
+</html>
