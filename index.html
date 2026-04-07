@@ -290,59 +290,64 @@
     }
 
     .repo-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-      gap: 16px;
+      display: flex; flex-direction: column; gap: 0;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden;
     }
 
     .repo {
-      position: relative; padding: 26px;
-      border-radius: var(--radius); border: 1px solid var(--border);
+      position: relative;
+      padding: 18px 24px;
       background: var(--surface);
       text-decoration: none; color: var(--text);
-      display: flex; flex-direction: column;
-      transition: all 0.25s ease; overflow: hidden;
+      display: flex; align-items: center; gap: 20px;
+      transition: background 0.15s ease;
+      border-bottom: 1px solid var(--border);
     }
 
-    .repo::after {
-      content: ''; position: absolute; top: 0; left: 0; right: 0;
-      height: 2px; opacity: 0; transition: opacity 0.25s ease;
+    .repo:last-child { border-bottom: none; }
+
+    .repo::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+      width: 3px; opacity: 0; transition: opacity 0.15s ease;
     }
 
     .repo:hover {
-      border-color: var(--border-hover); transform: translateY(-3px);
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+      background: var(--surface2);
     }
 
-    .repo:hover::after { opacity: 1; }
+    .repo:hover::before { opacity: 1; }
 
-    .repo[data-color="accent"]::after { background: var(--accent); }
-    .repo[data-color="violet"]::after { background: var(--violet); }
-    .repo[data-color="green"]::after { background: var(--green); }
-    .repo[data-color="amber"]::after { background: var(--amber); }
-    .repo[data-color="rose"]::after { background: var(--rose); }
-    .repo[data-color="teal"]::after { background: var(--teal); }
+    .repo[data-color="accent"]::before { background: var(--accent); }
+    .repo[data-color="violet"]::before { background: var(--violet); }
+    .repo[data-color="green"]::before { background: var(--green); }
+    .repo[data-color="amber"]::before { background: var(--amber); }
+    .repo[data-color="rose"]::before { background: var(--rose); }
+    .repo[data-color="teal"]::before { background: var(--teal); }
+
+    .repo__info { flex: 1; min-width: 0; }
 
     .repo__head {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      margin-bottom: 10px;
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 4px;
     }
 
     .repo__name {
       font-family: 'JetBrains Mono', monospace;
-      font-weight: 600; font-size: 1rem;
+      font-weight: 600; font-size: 0.95rem;
     }
 
     .repo__arrow {
-      color: var(--text-muted); font-size: 1.1rem;
+      color: var(--text-muted); font-size: 0.9rem;
       transition: all 0.2s ease;
     }
 
     .repo:hover .repo__arrow { color: var(--accent); transform: translate(2px, -2px); }
 
     .repo__desc {
-      color: var(--text-secondary); font-size: 0.88rem;
-      line-height: 1.6; flex: 1; margin-bottom: 16px;
+      color: var(--text-secondary); font-size: 0.82rem;
+      line-height: 1.5; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
     }
 
     .repo__tags { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -355,18 +360,23 @@
       border: 1px solid var(--border);
     }
 
+    .repo__right {
+      display: flex; align-items: center; gap: 10px;
+      flex-shrink: 0;
+    }
+
     .repo__links {
-      display: flex; gap: 8px; margin-top: 12px; padding-top: 12px;
-      border-top: 1px solid var(--border);
+      display: flex; gap: 6px;
     }
 
     .repo__link {
       padding: 4px 12px; border-radius: 6px;
-      font-size: 0.78rem; font-weight: 500;
+      font-size: 0.75rem; font-weight: 500;
       text-decoration: none; color: var(--accent);
       background: rgba(56, 189, 248, 0.08);
       border: 1px solid rgba(56, 189, 248, 0.15);
       transition: all 0.15s ease;
+      white-space: nowrap;
     }
 
     .repo__link:hover { background: rgba(56, 189, 248, 0.15); }
@@ -484,19 +494,19 @@
 
     /* ── Repo Stats (star / fork) ── */
     .repo__stats {
-      display: flex; gap: 12px; margin-bottom: 14px;
+      display: flex; gap: 8px;
     }
 
     .repo__stat {
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 3px 10px; border-radius: 6px;
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 6px;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem; font-weight: 500;
+      font-size: 0.72rem; font-weight: 500;
       text-decoration: none;
       transition: all 0.15s ease;
     }
 
-    .repo__stat svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .repo__stat svg { width: 13px; height: 13px; flex-shrink: 0; }
 
     .repo__stat--star {
       color: var(--amber); background: rgba(251, 191, 36, 0.08);
@@ -505,7 +515,6 @@
 
     .repo__stat--star:hover {
       background: rgba(251, 191, 36, 0.18);
-      transform: translateY(-1px);
     }
 
     .repo__stat--fork {
@@ -515,12 +524,11 @@
 
     .repo__stat--fork:hover {
       background: var(--surface2);
-      transform: translateY(-1px);
     }
 
     .repo__lang {
       display: inline-flex; align-items: center; gap: 5px;
-      font-size: 0.75rem; color: var(--text-muted);
+      font-size: 0.72rem; color: var(--text-muted);
     }
 
     .repo__lang-dot {
@@ -528,8 +536,7 @@
     }
 
     .repo__meta {
-      display: flex; align-items: center; gap: 14px;
-      flex-wrap: wrap;
+      display: flex; align-items: center; gap: 10px;
     }
 
     .repo__updated {
@@ -581,7 +588,9 @@
       section { padding: 60px 0; }
       .hero { min-height: auto; padding-top: 100px; padding-bottom: 40px; }
       .parts { grid-template-columns: 1fr; }
-      .repo-grid { grid-template-columns: 1fr; }
+      .repo { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .repo__right { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+      .repo__desc { white-space: normal; }
       .authors { grid-template-columns: 1fr; }
       .nav__links { display: none; }
     }
@@ -851,24 +860,28 @@
 
     return `
       <a href="${repo.html_url}" class="repo" data-color="${color}" target="_blank" rel="noopener">
-        <div class="repo__head">
-          <div class="repo__name">${repo.name}</div>
-          <span class="repo__arrow">&nearr;</span>
+        <div class="repo__info">
+          <div class="repo__head">
+            <div class="repo__name">${repo.name}</div>
+            <span class="repo__arrow">&nearr;</span>
+          </div>
+          <div class="repo__desc">${repo.description || ''}</div>
         </div>
-        <div class="repo__desc">${repo.description || ''}</div>
-        <div class="repo__stats">
-          <a href="${repo.html_url}/stargazers" class="repo__stat repo__stat--star" onclick="event.stopPropagation()" target="_blank" rel="noopener">
-            ${STAR_SVG} ${repo.stargazers_count}
-          </a>
-          <a href="${repo.html_url}/forks" class="repo__stat repo__stat--fork" onclick="event.stopPropagation()" target="_blank" rel="noopener">
-            ${FORK_SVG} ${repo.forks_count}
-          </a>
+        <div class="repo__right">
+          <div class="repo__meta">
+            ${langHtml}
+            <span class="repo__updated">${timeAgo(repo.updated_at)}</span>
+          </div>
+          <div class="repo__stats">
+            <a href="${repo.html_url}/stargazers" class="repo__stat repo__stat--star" onclick="event.stopPropagation()" target="_blank" rel="noopener">
+              ${STAR_SVG} ${repo.stargazers_count}
+            </a>
+            <a href="${repo.html_url}/forks" class="repo__stat repo__stat--fork" onclick="event.stopPropagation()" target="_blank" rel="noopener">
+              ${FORK_SVG} ${repo.forks_count}
+            </a>
+          </div>
+          ${linksHtml}
         </div>
-        <div class="repo__meta">
-          ${langHtml}
-          <span class="repo__updated">Updated ${timeAgo(repo.updated_at)}</span>
-        </div>
-        ${linksHtml}
       </a>`;
   }
 
