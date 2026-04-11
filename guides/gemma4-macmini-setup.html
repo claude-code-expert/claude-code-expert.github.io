@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemma 4 on Mac Mini — Ollama Setup Guide</title>
+  <meta name="description" content="Mac Mini M4 Pro에서 Ollama로 Gemma 4 31B 모델을 설치하고 최적화하는 가이드">
+  <meta property="og:title" content="Gemma 4 on Mac Mini — Ollama Setup Guide">
+  <meta property="og:description" content="Mac Mini M4 Pro 64GB 환경에서 Gemma 4 31B를 Ollama로 설치하고 GPU 최적화하는 단계별 가이드">
+  <meta property="og:url" content="https://claude-code-expert.github.io/guides/gemma4-macmini-setup.html">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #05070e;
+      --bg2: #0a0e1a;
+      --surface: #0f1525;
+      --surface2: #151d30;
+      --surface3: #1a2440;
+      --border: #1a2240;
+      --border-hover: #2a3660;
+      --text: #e4e8f1;
+      --text-secondary: #a0aec0;
+      --text-muted: #5a6a8a;
+      --accent: #38bdf8;
+      --accent-dim: #1e6ea0;
+      --green: #34d399;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --violet: #a78bfa;
+      --teal: #2dd4bf;
+      --radius: 14px;
+      --radius-lg: 22px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Noto Sans KR', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.75;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Backgrounds ── */
+    .bg-grid {
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(56, 189, 248, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56, 189, 248, 0.025) 1px, transparent 1px);
+      background-size: 64px 64px;
+      pointer-events: none; z-index: 0;
+    }
+
+    .bg-orb {
+      position: fixed; border-radius: 50%; filter: blur(140px);
+      pointer-events: none; z-index: 0;
+    }
+
+    .bg-orb--1 {
+      width: 700px; height: 700px; top: -250px; left: -150px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.10), transparent 70%);
+    }
+
+    .bg-orb--2 {
+      width: 500px; height: 500px; bottom: 30%; right: -150px;
+      background: radial-gradient(circle, rgba(167, 139, 250, 0.07), transparent 70%);
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 16px 0;
+      background: rgba(5, 7, 14, 0.75);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(26, 34, 64, 0.5);
+    }
+
+    .nav__inner {
+      max-width: 860px; margin: 0 auto; padding: 0 28px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .nav__brand {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 1.1rem; letter-spacing: -0.02em;
+      text-decoration: none; color: var(--text);
+    }
+
+    .nav__brand span { color: var(--accent); }
+
+    .nav__right { display: flex; align-items: center; gap: 8px; }
+
+    .nav__link {
+      padding: 6px 14px; border-radius: 8px;
+      font-size: 0.85rem; font-weight: 500;
+      text-decoration: none; color: var(--text-secondary);
+      transition: all 0.15s ease;
+    }
+
+    .nav__link:hover { background: var(--surface); color: var(--text); text-decoration: none; }
+
+    .nav__gh {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 16px; border-radius: 8px;
+      background: var(--surface); border: 1px solid var(--border);
+      font-size: 0.85rem; font-weight: 500;
+      text-decoration: none; color: var(--text-secondary);
+      transition: all 0.15s ease;
+    }
+
+    .nav__gh:hover { border-color: var(--border-hover); color: var(--text); text-decoration: none; }
+
+    .nav__gh svg { width: 16px; height: 16px; }
+
+    /* ── Layout ── */
+    .wrap {
+      position: relative; z-index: 1;
+      max-width: 860px; margin: 0 auto; padding: 0 28px;
+    }
+
+    /* ── Hero ── */
+    .guide-hero {
+      padding: 140px 0 60px;
+      text-align: center;
+    }
+
+    .guide-hero__badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 7px 18px; border-radius: 100px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem; color: var(--accent);
+      margin-bottom: 28px;
+    }
+
+    .guide-hero__badge::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+    }
+
+    .guide-hero__title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      line-height: 1.15; letter-spacing: -0.03em;
+      margin-bottom: 16px;
+    }
+
+    .guide-hero__title span {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--violet) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .guide-hero__sub {
+      font-size: 1.05rem; color: var(--text-muted);
+      max-width: 560px; margin: 0 auto;
+    }
+
+    /* ── Spec Bar ── */
+    .spec-bar {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;
+      margin-top: 32px;
+    }
+
+    .spec-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface);
+      font-size: 0.85rem;
+    }
+
+    .spec-item__label { color: var(--text-muted); }
+    .spec-item__value { font-weight: 600; color: var(--text); font-family: 'JetBrains Mono', monospace; }
+
+    /* ── TOC ── */
+    .toc {
+      margin: 0 0 48px;
+      padding: 28px 32px; border-radius: var(--radius);
+      border: 1px solid var(--border); background: var(--surface);
+    }
+
+    .toc__title {
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 1rem; margin-bottom: 16px;
+      color: var(--text-secondary);
+    }
+
+    .toc__list {
+      list-style: none; display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 6px 24px;
+    }
+
+    .toc__list li {
+      font-size: 0.88rem;
+    }
+
+    .toc__list a {
+      color: var(--text-muted); text-decoration: none;
+      padding: 4px 0; display: flex; align-items: center; gap: 8px;
+      transition: color 0.15s;
+    }
+
+    .toc__list a:hover { color: var(--accent); }
+
+    .toc__list .toc__num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem; color: var(--accent-dim);
+      width: 28px; flex-shrink: 0;
+    }
+
+    /* ── Content ── */
+    .content { padding-bottom: 80px; }
+
+    .content h2 {
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 1.6rem; letter-spacing: -0.02em;
+      margin: 64px 0 24px; padding-top: 24px;
+      border-top: 1px solid var(--border);
+      scroll-margin-top: 80px;
+    }
+
+    .content h2 .step-num {
+      color: var(--accent); margin-right: 8px;
+    }
+
+    .content h3 {
+      font-weight: 600; font-size: 1.1rem;
+      margin: 32px 0 16px;
+      color: var(--text-secondary);
+      scroll-margin-top: 80px;
+    }
+
+    .content p {
+      margin-bottom: 16px; color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    .content strong { color: var(--text); font-weight: 600; }
+
+    .content ul, .content ol {
+      margin-bottom: 16px; padding-left: 20px;
+      color: var(--text-secondary); font-size: 0.95rem;
+    }
+
+    .content li { margin-bottom: 6px; }
+
+    /* ── Code Blocks ── */
+    .code-block {
+      position: relative;
+      margin-bottom: 20px; border-radius: 10px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .code-block__header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem; color: var(--text-muted);
+    }
+
+    .code-block__copy {
+      padding: 4px 10px; border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted); font-size: 0.72rem;
+      font-family: 'JetBrains Mono', monospace;
+      cursor: pointer; transition: all 0.15s;
+    }
+
+    .code-block__copy:hover { border-color: var(--border-hover); color: var(--text); }
+    .code-block__copy.copied { color: var(--green); border-color: rgba(52, 211, 153, 0.3); }
+
+    pre {
+      margin: 0; padding: 20px;
+      background: var(--bg2);
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem; line-height: 1.7;
+      color: var(--text);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    pre code { background: none; padding: 0; border-radius: 0; font-size: inherit; }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85em; padding: 2px 7px;
+      border-radius: 5px;
+      background: var(--surface2);
+      color: var(--accent);
+    }
+
+    /* ── Syntax Highlighting (minimal) ── */
+    .hl-comment { color: var(--text-muted); font-style: italic; }
+    .hl-string { color: var(--green); }
+    .hl-keyword { color: var(--violet); }
+    .hl-flag { color: var(--amber); }
+    .hl-cmd { color: var(--accent); }
+    .hl-var { color: var(--rose); }
+
+    /* ── Tables ── */
+    .table-wrap {
+      margin-bottom: 20px; border-radius: 10px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%; border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    thead { background: var(--surface2); }
+
+    th {
+      padding: 12px 16px; text-align: left;
+      font-weight: 600; color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+    }
+
+    td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    tbody tr { transition: background 0.15s; }
+    tbody tr:hover { background: var(--surface); }
+
+    /* ── Callout ── */
+    .callout {
+      margin-bottom: 20px; padding: 16px 20px;
+      border-radius: 10px; border-left: 3px solid;
+      font-size: 0.88rem;
+    }
+
+    .callout--info {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.05);
+      color: var(--text-secondary);
+    }
+
+    .callout--warn {
+      border-color: var(--amber);
+      background: rgba(251, 191, 36, 0.05);
+      color: var(--text-secondary);
+    }
+
+    .callout--tip {
+      border-color: var(--green);
+      background: rgba(52, 211, 153, 0.05);
+      color: var(--text-secondary);
+    }
+
+    .callout strong { display: block; margin-bottom: 4px; }
+
+    /* ── Divider ── */
+    .divider {
+      border: none; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+      margin: 0;
+    }
+
+    /* ── Footer ── */
+    footer {
+      padding: 40px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer__inner {
+      display: flex; flex-wrap: wrap; justify-content: space-between;
+      align-items: center; gap: 16px;
+    }
+
+    .footer__copy {
+      font-size: 0.82rem; color: var(--text-muted);
+    }
+
+    .footer__copy a { color: var(--text-secondary); }
+    .footer__copy a:hover { color: var(--accent); text-decoration: none; }
+
+    .footer__links { display: flex; gap: 20px; }
+
+    .footer__links a {
+      font-size: 0.82rem; text-decoration: none;
+      color: var(--text-muted); transition: color 0.15s;
+    }
+
+    .footer__links a:hover { color: var(--text); text-decoration: none; }
+
+    /* ── Back to top ── */
+    .back-top {
+      position: fixed; bottom: 32px; right: 32px; z-index: 90;
+      width: 44px; height: 44px; border-radius: 12px;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--text-muted); font-size: 1.1rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: all 0.25s ease;
+    }
+
+    .back-top.show { opacity: 1; pointer-events: auto; }
+    .back-top:hover { border-color: var(--border-hover); color: var(--accent); transform: translateY(-2px); }
+
+    /* ── Animation ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .reveal {
+      opacity: 0; transform: translateY(22px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+
+    .reveal.vis { opacity: 1; transform: translateY(0); }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .wrap { padding: 0 18px; }
+      .guide-hero { padding: 120px 0 40px; }
+      .spec-bar { gap: 8px; }
+      .spec-item { padding: 8px 14px; font-size: 0.8rem; }
+      .toc__list { grid-template-columns: 1fr; }
+      .content h2 { font-size: 1.3rem; }
+      pre { font-size: 0.75rem; padding: 16px; }
+      .nav__right .nav__link { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-orb bg-orb--1"></div>
+<div class="bg-orb bg-orb--2"></div>
+
+<!-- Nav -->
+<nav>
+  <div class="nav__inner">
+    <a href="/" class="nav__brand"><span>Claude Code</span> Expert</a>
+    <div class="nav__right">
+      <a href="/" class="nav__link">Home</a>
+      <a href="https://github.com/claude-code-expert/.github/blob/main/profile/md/gemma4-31b-macmini-setup.md" class="nav__gh">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        Markdown
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="guide-hero">
+  <div class="wrap">
+    <div class="guide-hero__badge">Ollama v0.20.5+ &middot; Apple Silicon</div>
+    <h1 class="guide-hero__title"><span>Gemma 4</span> on Mac Mini</h1>
+    <p class="guide-hero__sub">Mac Mini M4 Pro에서 Ollama로 Gemma 4 31B 모델을 설치하고 GPU 최적화하는 단계별 가이드</p>
+
+    <div class="spec-bar">
+      <div class="spec-item">
+        <span class="spec-item__label">CPU</span>
+        <span class="spec-item__value">M4 Pro 14C</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-item__label">GPU</span>
+        <span class="spec-item__value">20C</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-item__label">Memory</span>
+        <span class="spec-item__value">64GB</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-item__label">Model</span>
+        <span class="spec-item__value">~19GB Q4_K_M</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- Main Content -->
+<main class="wrap content">
+
+  <!-- TOC -->
+  <div class="toc reveal">
+    <div class="toc__title">Table of Contents</div>
+    <ul class="toc__list">
+      <li><a href="#prereq"><span class="toc__num">00</span>사전 확인</a></li>
+      <li><a href="#model-select"><span class="toc__num">01</span>모델 선택 — 메모리 기준</a></li>
+      <li><a href="#step1"><span class="toc__num">02</span>Ollama 설치</a></li>
+      <li><a href="#step2"><span class="toc__num">03</span>Ollama 실행</a></li>
+      <li><a href="#step3"><span class="toc__num">04</span>모델 다운로드</a></li>
+      <li><a href="#step4"><span class="toc__num">05</span>환경변수 설정</a></li>
+      <li><a href="#step5"><span class="toc__num">06</span>테스트</a></li>
+      <li><a href="#step6"><span class="toc__num">07</span>상태 확인</a></li>
+      <li><a href="#step7"><span class="toc__num">08</span>자동 시작 설정</a></li>
+      <li><a href="#api"><span class="toc__num">09</span>API 연동</a></li>
+      <li><a href="#commands"><span class="toc__num">10</span>유용한 명령어</a></li>
+      <li><a href="#troubleshoot"><span class="toc__num">11</span>트러블슈팅</a></li>
+    </ul>
+  </div>
+
+  <!-- 사전 확인 -->
+  <h2 id="prereq" class="reveal"><span class="step-num">00.</span> 사전 확인</h2>
+  <div class="reveal">
+    <ul>
+      <li>Homebrew 설치 필요 (<code>/opt/homebrew</code>)</li>
+      <li>macOS 최신 버전 권장</li>
+      <li>디스크 여유 공간 25GB 이상</li>
+    </ul>
+  </div>
+
+  <!-- 모델 선택 -->
+  <h2 id="model-select" class="reveal"><span class="step-num">01.</span> 모델 선택 — 메모리 기준</h2>
+  <div class="reveal">
+    <p>Mac Mini의 통합 메모리 용량에 따라 권장 모델이 다릅니다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>통합 메모리</th><th>권장 모델</th><th>다운로드 크기</th><th>메모리 사용</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>16GB</td><td><code>gemma4:e4b</code></td><td>~9.6GB</td><td>~6GB</td></tr>
+          <tr><td>24GB ~ 47GB</td><td><code>gemma4:26b</code></td><td>~17GB</td><td>~18GB</td></tr>
+          <tr><td><strong>48GB 이상</strong></td><td><strong><code>gemma4:31b</code></strong></td><td><strong>~19GB</strong></td><td><strong>~20GB</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout callout--info">
+      <strong>Tip</strong>
+      macOS 시스템이 약 3~5GB를 상시 점유하므로 <strong>48GB 미만이라면 31B 대신 26B를 강력 권장</strong>합니다.
+      26B MoE 모델은 추론 시 실제 활성 파라미터가 ~4B에 불과해 속도도 31B보다 빠릅니다.
+    </div>
+  </div>
+
+  <h3 class="reveal">48GB 미만 — gemma4:26b</h3>
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code>ollama pull gemma4:26b</code></pre>
+  </div>
+
+  <h3 class="reveal">48GB 이상 — gemma4:31b (본 가이드 기준)</h3>
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code>ollama pull gemma4:31b</code></pre>
+  </div>
+
+  <!-- Step 1 -->
+  <h2 id="step1" class="reveal"><span class="step-num">02.</span> Ollama 설치</h2>
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code>brew install <span class="hl-flag">--cask</span> ollama-app</code></pre>
+  </div>
+  <div class="reveal">
+    <p>설치 결과:</p>
+    <ul>
+      <li><code>Ollama.app</code> &rarr; <code>/Applications/Ollama.app</code></li>
+      <li>CLI &rarr; <code>/opt/homebrew/bin/ollama</code></li>
+    </ul>
+  </div>
+
+  <!-- Step 2 -->
+  <h2 id="step2" class="reveal"><span class="step-num">03.</span> Ollama 실행</h2>
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code>open <span class="hl-flag">-a</span> Ollama</code></pre>
+  </div>
+  <div class="reveal">
+    <p>메뉴바에 Ollama 아이콘이 표시되면 서버 준비 완료.</p>
+  </div>
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code><span class="hl-comment"># 실행 확인</span>
+ollama list</code></pre>
+  </div>
+
+  <!-- Step 3 -->
+  <h2 id="step3" class="reveal"><span class="step-num">04.</span> 모델 다운로드</h2>
+  <div class="reveal">
+    <p>메모리에 맞는 모델을 선택해서 다운로드하세요.</p>
+  </div>
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code><span class="hl-comment"># 48GB 미만 Mac Mini → 26B 권장</span>
+ollama pull gemma4:26b
+
+<span class="hl-comment"># 48GB 이상 Mac Mini → 31B 권장</span>
+ollama pull gemma4:31b</code></pre>
+  </div>
+
+  <div class="reveal" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+    <div class="callout callout--tip" style="margin-bottom: 0;">
+      <strong>31B 기준</strong>
+      다운로드: ~19GB<br>
+      메모리: ~20GB (Q4_K_M)<br>
+      64GB 여유: ~44GB
+    </div>
+    <div class="callout callout--info" style="margin-bottom: 0;">
+      <strong>26B 기준</strong>
+      다운로드: ~17GB<br>
+      메모리: ~18GB (MoE, 활성 ~4B)<br>
+      24GB 여유: ~6GB (빠듯)
+    </div>
+  </div>
+
+  <!-- Step 4 -->
+  <h2 id="step4" class="reveal"><span class="step-num">05.</span> 환경변수 설정 (GPU 최적화 + 상시 로딩)</h2>
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash — 현재 세션에 즉시 적용</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code>launchctl setenv <span class="hl-var">OLLAMA_NUM_GPU</span> <span class="hl-string">99</span>
+launchctl setenv <span class="hl-var">OLLAMA_KEEP_ALIVE</span> <span class="hl-string">"-1"</span></code></pre>
+  </div>
+
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash — 재부팅 후에도 유지 (zshrc 영구 등록)</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code><span class="hl-keyword">echo</span> <span class="hl-string">'export OLLAMA_NUM_GPU=99'</span> >> ~/.zshrc
+<span class="hl-keyword">echo</span> <span class="hl-string">'export OLLAMA_KEEP_ALIVE="-1"'</span> >> ~/.zshrc</code></pre>
+  </div>
+
+  <div class="callout callout--warn reveal">
+    <strong>Warning</strong>
+    환경변수 적용 후 Ollama를 <strong>반드시 재시작</strong>해야 합니다.
+  </div>
+
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash — Ollama 재시작</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code>pkill <span class="hl-flag">-x</span> Ollama
+sleep 2
+open <span class="hl-flag">-a</span> Ollama
+sleep 3</code></pre>
+  </div>
+
+  <div class="table-wrap reveal">
+    <table>
+      <thead>
+        <tr><th>환경변수</th><th>설명</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>OLLAMA_NUM_GPU 99</code></td><td>가능한 모든 레이어를 GPU에 올림. 미설정 시 CPU fallback으로 속도 반토막</td></tr>
+        <tr><td><code>OLLAMA_KEEP_ALIVE -1</code></td><td>모델 영구 메모리 유지. 기본값은 5분 후 자동 언로드</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Step 5 -->
+  <h2 id="step5" class="reveal"><span class="step-num">06.</span> 테스트</h2>
+
+  <h3 class="reveal">기본 테스트 (단순 실행)</h3>
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code>ollama run gemma4:31b <span class="hl-string">"안녕, 넌 어떤 모델이야?"</span></code></pre>
+  </div>
+
+  <h3 class="reveal">대화형 모드 (컨텍스트 길이 설정 포함)</h3>
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code>ollama run gemma4:31b</code></pre>
+  </div>
+
+  <div class="reveal">
+    <p>진입 후:</p>
+  </div>
+
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>ollama interactive</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code>&gt;&gt;&gt; /set parameter num_ctx 32768
+Set parameter 'num_ctx' to '32768'
+
+&gt;&gt;&gt; 안녕, 넌 어떤 모델이야?</code></pre>
+  </div>
+
+  <div class="callout callout--warn reveal">
+    <strong>Warning</strong>
+    <code>--num-ctx</code> 플래그는 대화형 모드에서만 동작합니다.<br>
+    <code>ollama run gemma4:31b --num-ctx 32768 "..."</code> 형태는 지원하지 않습니다.
+  </div>
+
+  <h3 class="reveal">권장 컨텍스트 길이</h3>
+  <div class="table-wrap reveal">
+    <table>
+      <thead>
+        <tr><th>컨텍스트</th><th>추가 메모리</th><th>추천 용도</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>8,192</td><td>~0.6GB</td><td>빠른 테스트, 짧은 대화</td></tr>
+        <tr><td><strong>32,768</strong></td><td><strong>~2.5GB</strong></td><td><strong>일반 사용 권장</strong></td></tr>
+        <tr><td>65,536</td><td>~5GB</td><td>긴 문서 분석</td></tr>
+        <tr><td>131,072</td><td>~10GB</td><td>코드베이스 전체 컨텍스트</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Step 6 -->
+  <h2 id="step6" class="reveal"><span class="step-num">07.</span> 상태 확인</h2>
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code>ollama ps</code></pre>
+  </div>
+
+  <div class="reveal">
+    <p>정상 출력 예시:</p>
+  </div>
+
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>output</span></div>
+    <pre><code>NAME           SIZE    PROCESSOR        CONTEXT    UNTIL
+gemma4:31b     20 GB   12%/88% CPU/GPU  32768      Forever</code></pre>
+  </div>
+
+  <div class="reveal">
+    <ul>
+      <li><code>CPU/GPU</code> 비율에서 GPU 비중이 높을수록 정상</li>
+      <li><code>UNTIL</code> 컬럼이 <code>Forever</code>이면 Keep-alive 정상 적용</li>
+    </ul>
+  </div>
+
+  <!-- Step 7 -->
+  <h2 id="step7" class="reveal"><span class="step-num">08.</span> 자동 시작 설정 (선택)</h2>
+
+  <h3 class="reveal">7a. 로그인 시 Ollama 자동 실행</h3>
+  <div class="reveal">
+    <p>메뉴바 아이콘 &rarr; <strong>Launch at Login</strong> 체크<br>
+    또는: <strong>시스템 설정 &gt; 일반 &gt; 로그인 항목</strong>에서 Ollama 추가</p>
+  </div>
+
+  <h3 class="reveal">7b. 부팅 시 모델 자동 프리로드 (LaunchAgent)</h3>
+  <div class="callout callout--warn reveal">
+    <strong>Warning</strong>
+    <code>~/Library/LaunchAgents/</code> 폴더가 없으면 <code>permission denied</code> 오류가 발생합니다.
+    아래 명령어에 <code>mkdir -p</code>가 포함되어 있으니 그대로 실행하세요.
+    또한 plist 내부 DOCTYPE 라인에 백슬래시(<code>\</code>)가 섞이지 않도록 주의하세요.
+  </div>
+
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash — LaunchAgent 등록</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code><span class="hl-comment"># LaunchAgents 폴더 생성 (없을 경우 대비)</span>
+mkdir <span class="hl-flag">-p</span> ~/Library/LaunchAgents
+
+cat &lt;&lt; <span class="hl-string">'EOF'</span> &gt; ~/Library/LaunchAgents/com.ollama.preload-gemma4.plist
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;
+&lt;plist version="1.0"&gt;
+&lt;dict&gt;
+    &lt;key&gt;Label&lt;/key&gt;
+    &lt;string&gt;com.ollama.preload-gemma4&lt;/string&gt;
+    &lt;key&gt;ProgramArguments&lt;/key&gt;
+    &lt;array&gt;
+        &lt;string&gt;/opt/homebrew/bin/ollama&lt;/string&gt;
+        &lt;string&gt;run&lt;/string&gt;
+        &lt;string&gt;gemma4:31b&lt;/string&gt;
+        &lt;string&gt;&lt;/string&gt;
+    &lt;/array&gt;
+    &lt;key&gt;RunAtLoad&lt;/key&gt;
+    &lt;true/&gt;
+    &lt;key&gt;StartInterval&lt;/key&gt;
+    &lt;integer&gt;300&lt;/integer&gt;
+    &lt;key&gt;StandardOutPath&lt;/key&gt;
+    &lt;string&gt;/tmp/ollama-preload.log&lt;/string&gt;
+    &lt;key&gt;StandardErrorPath&lt;/key&gt;
+    &lt;string&gt;/tmp/ollama-preload.log&lt;/string&gt;
+&lt;/dict&gt;
+&lt;/plist&gt;
+EOF
+
+launchctl load ~/Library/LaunchAgents/com.ollama.preload-gemma4.plist
+<span class="hl-keyword">echo</span> <span class="hl-string">"완료: $?"</span></code></pre>
+  </div>
+
+  <div class="reveal">
+    <p>마지막 줄에 <code>완료: 0</code>이 출력되면 성공입니다.</p>
+  </div>
+
+  <!-- API -->
+  <h2 id="api" class="reveal"><span class="step-num">09.</span> API 연동 (OpenAI 호환)</h2>
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash — curl</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code>curl http://localhost:11434/v1/chat/completions \
+  <span class="hl-flag">-H</span> <span class="hl-string">"Content-Type: application/json"</span> \
+  <span class="hl-flag">-d</span> <span class="hl-string">'{
+    "model": "gemma4:31b",
+    "messages": [{"role": "user", "content": "안녕"}]
+  }'</span></code></pre>
+  </div>
+
+  <div class="reveal">
+    <p>기존 OpenAI SDK 코드에서 base URL만 변경하면 그대로 사용 가능:</p>
+  </div>
+
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>python</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code><span class="hl-keyword">from</span> openai <span class="hl-keyword">import</span> OpenAI
+
+client = OpenAI(
+    base_url=<span class="hl-string">"http://localhost:11434/v1"</span>,
+    api_key=<span class="hl-string">"ollama"</span>  <span class="hl-comment"># 아무 값이나 가능</span>
+)
+
+response = client.chat.completions.create(
+    model=<span class="hl-string">"gemma4:31b"</span>,
+    messages=[{<span class="hl-string">"role"</span>: <span class="hl-string">"user"</span>, <span class="hl-string">"content"</span>: <span class="hl-string">"안녕"</span>}]
+)
+<span class="hl-keyword">print</span>(response.choices[0].message.content)</code></pre>
+  </div>
+
+  <!-- Commands -->
+  <h2 id="commands" class="reveal"><span class="step-num">10.</span> 유용한 명령어 모음</h2>
+  <div class="table-wrap reveal">
+    <table>
+      <thead>
+        <tr><th>명령어</th><th>설명</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ollama list</code></td><td>다운로드된 모델 목록</td></tr>
+        <tr><td><code>ollama ps</code></td><td>현재 로딩된 모델 및 메모리</td></tr>
+        <tr><td><code>ollama run gemma4:31b</code></td><td>대화형 모드 진입</td></tr>
+        <tr><td><code>ollama stop gemma4:31b</code></td><td>메모리에서 모델 언로드</td></tr>
+        <tr><td><code>ollama pull gemma4:31b</code></td><td>최신 버전으로 업데이트</td></tr>
+        <tr><td><code>ollama rm gemma4:31b</code></td><td>모델 삭제</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Uninstall -->
+  <div class="reveal">
+    <h3>제거 방법</h3>
+  </div>
+  <div class="code-block reveal">
+    <div class="code-block__header"><span>bash</span><button class="code-block__copy" onclick="copyCode(this)">Copy</button></div>
+    <pre><code><span class="hl-comment"># LaunchAgent 제거</span>
+launchctl unload ~/Library/LaunchAgents/com.ollama.preload-gemma4.plist
+rm ~/Library/LaunchAgents/com.ollama.preload-gemma4.plist
+
+<span class="hl-comment"># Ollama 제거</span>
+brew uninstall <span class="hl-flag">--cask</span> ollama-app</code></pre>
+  </div>
+
+  <!-- Troubleshooting -->
+  <h2 id="troubleshoot" class="reveal"><span class="step-num">11.</span> 트러블슈팅</h2>
+  <div class="table-wrap reveal">
+    <table>
+      <thead>
+        <tr><th>증상</th><th>원인</th><th>해결</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>Error: unknown flag: --num-ctx</code></td>
+          <td>인라인 명령어에서 플래그 불가</td>
+          <td>대화형 모드 진입 후 <code>/set parameter num_ctx 값</code> 사용</td>
+        </tr>
+        <tr>
+          <td>응답 없음 (첫 실행)</td>
+          <td>20GB 모델 로딩 중</td>
+          <td>30~60초 대기, <code>ollama ps</code>로 확인</td>
+        </tr>
+        <tr>
+          <td>GPU 비중 낮음 (CPU 80%+)</td>
+          <td>환경변수 미적용</td>
+          <td>Ollama 재시작 후 <code>OLLAMA_NUM_GPU 99</code> 재설정</td>
+        </tr>
+        <tr>
+          <td>메모리 부족 오류</td>
+          <td>컨텍스트 너무 큼</td>
+          <td><code>num_ctx</code> 값을 8192로 낮춰서 재시도</td>
+        </tr>
+        <tr>
+          <td>느린 속도 (1 tok/s 미만)</td>
+          <td>CPU fallback</td>
+          <td><code>ollama ps</code>에서 GPU 비중 확인, Ollama 재시작</td>
+        </tr>
+        <tr>
+          <td><code>permission denied</code></td>
+          <td><code>~/Library/LaunchAgents</code> 폴더 없음</td>
+          <td><code>mkdir -p ~/Library/LaunchAgents</code> 실행 후 재시도</td>
+        </tr>
+        <tr>
+          <td><code>Load failed: 5: Input/output error</code></td>
+          <td>plist 문법 오류</td>
+          <td>plist 파일 삭제 후 Step 7b 명령어 재실행</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+
+<hr class="divider">
+
+<!-- Footer -->
+<footer>
+  <div class="wrap">
+    <div class="footer__inner">
+      <div class="footer__copy">
+        &copy; 2026 <a href="https://github.com/claude-code-expert">Claude Code Expert</a> &middot; 한빛미디어
+      </div>
+      <div class="footer__links">
+        <a href="/">Home</a>
+        <a href="https://github.com/claude-code-expert">GitHub</a>
+        <a href="https://github.com/claude-code-expert/.github/blob/main/profile/md/gemma4-31b-macmini-setup.md">Markdown</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- Back to top -->
+<button class="back-top" id="backTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">&uarr;</button>
+
+<script>
+  // ── Scroll Reveal ──
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) {
+        e.target.style.transitionDelay = `${Math.min(i * 40, 200)}ms`;
+        e.target.classList.add('vis');
+        obs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+  // ── Back to top button ──
+  const backTop = document.getElementById('backTop');
+  window.addEventListener('scroll', () => {
+    backTop.classList.toggle('show', window.scrollY > 400);
+  });
+
+  // ── Copy code ──
+  function copyCode(btn) {
+    const code = btn.closest('.code-block').querySelector('code');
+    const text = code.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+</script>
+
+</body>
+</html>
