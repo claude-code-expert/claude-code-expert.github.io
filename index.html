@@ -379,6 +379,62 @@
 
     .repo__link--green:hover { background: rgba(52, 211, 153, 0.15); }
 
+    /* ── Guide List ── */
+    .guide-item {
+      position: relative;
+      padding: 14px 24px;
+      background: var(--surface);
+      color: var(--text);
+      text-decoration: none;
+      display: block;
+      transition: background 0.15s ease;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .guide-item:last-child { border-bottom: none; }
+
+    .guide-item::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+      width: 3px; background: var(--accent); opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    .guide-item:hover { background: var(--surface2); }
+    .guide-item:hover::before { opacity: 1; }
+
+    .guide-item__top {
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    .guide-item__name {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600; font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    .guide-item:hover .guide-item__name { color: var(--accent); }
+
+    .guide-item__arrow {
+      color: var(--text-muted); font-size: 0.9rem;
+      transition: all 0.2s ease;
+    }
+
+    .guide-item:hover .guide-item__arrow { color: var(--accent); transform: translate(2px, -2px); }
+
+    .guide-item__tag {
+      margin-left: auto;
+      padding: 3px 10px; border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem; font-weight: 500;
+      background: rgba(56, 189, 248, 0.08); color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.15);
+    }
+
+    .guide-item__desc {
+      color: var(--text-secondary); font-size: 0.82rem;
+      line-height: 1.5; margin-top: 4px; padding-left: 2px;
+    }
+
     /* ── Image Showcase ── */
     .showcase {
       margin-top: 24px;
@@ -559,6 +615,8 @@
       .parts { grid-template-columns: 1fr; }
       .repo__top { flex-wrap: wrap; }
       .repo__right { flex-wrap: wrap; }
+      .guide-item__top { flex-wrap: wrap; }
+      .guide-item__tag { margin-left: 0; }
       .authors { grid-template-columns: 1fr; }
       .nav__links { display: none; }
     }
@@ -582,6 +640,7 @@
     <div class="nav__links">
       <a href="#book" class="nav__link">책 소개</a>
       <a href="#repos" class="nav__link">레포지토리</a>
+      <a href="#guides" class="nav__link">가이드</a>
       <a href="#authors" class="nav__link">저자</a>
     </div>
     <a href="https://github.com/claude-code-expert" class="nav__gh">
@@ -678,6 +737,53 @@
       </div>
     </div>
 
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- Guides -->
+<section id="guides">
+  <div class="wrap">
+    <div class="sh reveal">
+      <div class="sh__label">Guides</div>
+      <h2 class="sh__title">가이드 문서</h2>
+      <p class="sh__desc">실전 활용 가이드와 레퍼런스 문서</p>
+    </div>
+    <div class="repo-grid reveal">
+      <a href="guides/claude-code-cheatsheet-ko.html" class="guide-item">
+        <div class="guide-item__top">
+          <span class="guide-item__name">Claude Code Cheat Sheet</span>
+          <span class="guide-item__arrow">&nearr;</span>
+          <span class="guide-item__tag">Reference</span>
+        </div>
+        <div class="guide-item__desc">Claude Code 핵심 명령어와 워크플로우 한국어 치트시트</div>
+      </a>
+      <a href="guides/claude-code-unshipped.html" class="guide-item">
+        <div class="guide-item__top">
+          <span class="guide-item__name">Claude Code — Unshipped Features</span>
+          <span class="guide-item__arrow">&nearr;</span>
+          <span class="guide-item__tag">Analysis</span>
+        </div>
+        <div class="guide-item__desc">아직 공개되지 않은 Claude Code 예정 기능 분석</div>
+      </a>
+      <a href="guides/cc-best-practice_awesome-cc-subagent.html" class="guide-item">
+        <div class="guide-item__top">
+          <span class="guide-item__name">Subagent Best Practice</span>
+          <span class="guide-item__arrow">&nearr;</span>
+          <span class="guide-item__tag">Best Practice</span>
+        </div>
+        <div class="guide-item__desc">Claude Code 서브에이전트 활용 사례 비교 분석</div>
+      </a>
+      <a href="guides/gemma4-macmini-setup.html" class="guide-item">
+        <div class="guide-item__top">
+          <span class="guide-item__name">Gemma 4 on Mac Mini</span>
+          <span class="guide-item__arrow">&nearr;</span>
+          <span class="guide-item__tag">Setup Guide</span>
+        </div>
+        <div class="guide-item__desc">Mac Mini M4 Pro에서 Ollama로 Gemma 4 모델 설치 및 최적화 가이드</div>
+      </a>
+    </div>
   </div>
 </section>
 
