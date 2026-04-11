@@ -297,10 +297,9 @@
 
     .repo {
       position: relative;
-      padding: 18px 24px;
+      padding: 14px 24px;
       background: var(--surface);
-      text-decoration: none; color: var(--text);
-      display: flex; align-items: center; gap: 20px;
+      color: var(--text);
       transition: background 0.15s ease;
       border-bottom: 1px solid var(--border);
     }
@@ -325,43 +324,34 @@
     .repo[data-color="rose"]::before { background: var(--rose); }
     .repo[data-color="teal"]::before { background: var(--teal); }
 
-    .repo__info { flex: 1; min-width: 0; }
-
-    .repo__head {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 4px;
+    .repo__top {
+      display: flex; align-items: center; gap: 10px;
     }
 
     .repo__name {
       font-family: 'JetBrains Mono', monospace;
       font-weight: 600; font-size: 0.95rem;
+      text-decoration: none; color: var(--text);
+      display: inline-flex; align-items: center; gap: 6px;
     }
+
+    .repo__name:hover { color: var(--accent); }
 
     .repo__arrow {
       color: var(--text-muted); font-size: 0.9rem;
       transition: all 0.2s ease;
     }
 
-    .repo:hover .repo__arrow { color: var(--accent); transform: translate(2px, -2px); }
+    .repo__name:hover .repo__arrow { color: var(--accent); transform: translate(2px, -2px); }
 
     .repo__desc {
       color: var(--text-secondary); font-size: 0.82rem;
-      line-height: 1.5; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis;
-    }
-
-    .repo__tags { display: flex; flex-wrap: wrap; gap: 6px; }
-
-    .repo__tag {
-      padding: 3px 10px; border-radius: 6px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.68rem; font-weight: 500;
-      background: var(--bg2); color: var(--text-muted);
-      border: 1px solid var(--border);
+      line-height: 1.5; margin-top: 4px; padding-left: 2px;
     }
 
     .repo__right {
-      display: flex; align-items: center; gap: 10px;
+      margin-left: auto;
+      display: flex; align-items: center; gap: 8px;
       flex-shrink: 0;
     }
 
@@ -493,10 +483,6 @@
     .footer__links a:hover { color: var(--text); }
 
     /* ── Repo Stats (star / fork) ── */
-    .repo__stats {
-      display: flex; gap: 8px;
-    }
-
     .repo__stat {
       display: inline-flex; align-items: center; gap: 4px;
       padding: 2px 8px; border-radius: 6px;
@@ -526,23 +512,6 @@
       background: var(--surface2);
     }
 
-    .repo__lang {
-      display: inline-flex; align-items: center; gap: 5px;
-      font-size: 0.72rem; color: var(--text-muted);
-    }
-
-    .repo__lang-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-    }
-
-    .repo__meta {
-      display: flex; align-items: center; gap: 10px;
-    }
-
-    .repo__updated {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.68rem; color: var(--text-muted);
-    }
 
     /* ── Loading ���─ */
     .repo-loading {
@@ -588,9 +557,8 @@
       section { padding: 60px 0; }
       .hero { min-height: auto; padding-top: 100px; padding-bottom: 40px; }
       .parts { grid-template-columns: 1fr; }
-      .repo { flex-direction: column; align-items: flex-start; gap: 10px; }
-      .repo__right { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
-      .repo__desc { white-space: normal; }
+      .repo__top { flex-wrap: wrap; }
+      .repo__right { flex-wrap: wrap; }
       .authors { grid-template-columns: 1fr; }
       .nav__links { display: none; }
     }
@@ -668,7 +636,7 @@
       </div>
       <div class="part reveal">
         <div class="part__num">03</div>
-        <div class="part__title">중급편</div>
+        <div class="part__title">실전편</div>
         <div class="part__desc">AWS Bedrock AI 챗봇 — 스트리밍, 컨텍스트 관리, Tool Use, 할루시네이션 대응</div>
       </div>
     </div>
@@ -847,42 +815,29 @@
 
     let linksHtml = '';
     if (links.length) {
-      linksHtml = '<div class="repo__links">' + links.map(l =>
-        `<a href="${l.url}" class="repo__link${l.green ? ' repo__link--green' : ''}" onclick="event.stopPropagation()">${l.label}</a>`
-      ).join('') + '</div>';
+      linksHtml = links.map(l =>
+        `<a href="${l.url}" class="repo__link${l.green ? ' repo__link--green' : ''}" target="_blank" rel="noopener">${l.label}</a>`
+      ).join('');
     }
 
-    let langHtml = '';
-    if (repo.language) {
-      const c = LANG_COLORS[repo.language] || '#8b949e';
-      langHtml = `<span class="repo__lang"><span class="repo__lang-dot" style="background:${c}"></span>${repo.language}</span>`;
-    }
+    const desc = repo.description ? `<div class="repo__desc">${repo.description}</div>` : '';
 
     return `
-      <a href="${repo.html_url}" class="repo" data-color="${color}" target="_blank" rel="noopener">
-        <div class="repo__info">
-          <div class="repo__head">
-            <div class="repo__name">${repo.name}</div>
-            <span class="repo__arrow">&nearr;</span>
-          </div>
-          <div class="repo__desc">${repo.description || ''}</div>
-        </div>
-        <div class="repo__right">
-          <div class="repo__meta">
-            ${langHtml}
-            <span class="repo__updated">${timeAgo(repo.updated_at)}</span>
-          </div>
-          <div class="repo__stats">
-            <a href="${repo.html_url}/stargazers" class="repo__stat repo__stat--star" onclick="event.stopPropagation()" target="_blank" rel="noopener">
+      <div class="repo" data-color="${color}">
+        <div class="repo__top">
+          <a href="${repo.html_url}" class="repo__name" target="_blank" rel="noopener">${repo.name}<span class="repo__arrow">&nearr;</span></a>
+          <div class="repo__right">
+            <a href="${repo.html_url}/stargazers" class="repo__stat repo__stat--star" target="_blank" rel="noopener">
               ${STAR_SVG} ${repo.stargazers_count}
             </a>
-            <a href="${repo.html_url}/forks" class="repo__stat repo__stat--fork" onclick="event.stopPropagation()" target="_blank" rel="noopener">
+            <a href="${repo.html_url}/forks" class="repo__stat repo__stat--fork" target="_blank" rel="noopener">
               ${FORK_SVG} ${repo.forks_count}
             </a>
+            ${linksHtml}
           </div>
-          ${linksHtml}
         </div>
-      </a>`;
+        ${desc}
+      </div>`;
   }
 
   // ── Main: fetch & render ──
@@ -894,28 +849,18 @@
       if (!res.ok) throw new Error(res.status);
       const repos = await res.json();
 
-      // Categorize
-      const grouped = { book: [], oss: [], starter: [], other: [] };
-      repos.forEach(repo => {
-        if (repo.name === '.github' || repo.name === 'claude-code-expert.github.io') return;
-        const cfg = REPO_CONFIG[repo.name];
-        const cat = cfg ? cfg.category : 'other';
-        grouped[cat].push({ repo, cfg: cfg || {} });
-      });
+      // Filter, sort A-Z, render
+      const items = repos
+        .filter(repo => repo.name !== '.github' && repo.name !== 'claude-code-expert.github.io')
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(repo => ({ repo, cfg: REPO_CONFIG[repo.name] || {} }));
 
-      // Render
-      let html = '';
-      CATEGORIES.forEach(cat => {
-        const items = grouped[cat.key];
-        if (!items.length) return;
-        html += `
-          <div class="repo-section reveal">
-            <div class="repo-section__label">${cat.label}</div>
-            <div class="repo-grid">
-              ${items.map(({ repo, cfg }) => buildCard(repo, cfg)).join('')}
-            </div>
-          </div>`;
-      });
+      const html = `
+        <div class="repo-section reveal">
+          <div class="repo-grid">
+            ${items.map(({ repo, cfg }) => buildCard(repo, cfg)).join('')}
+          </div>
+        </div>`;
 
       container.innerHTML = html;
       initReveal();
