@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Claude Code Expert — AI와 함께하는 개발</title>
+  <title>Claude Code Master — AI와 함께하는 개발</title>
   <meta name="description" content="클로드 코드 마스터 (한빛미디어) — 설계부터 배포까지, AI와 함께하는 개발. 공식 GitHub 조직 랜딩 페이지.">
-  <meta property="og:title" content="Claude Code Expert">
+  <meta property="og:title" content="Claude Code Master">
   <meta property="og:description" content="AI와 함께하는 개발 — 원칙, 방법론, 그리고 실전 코드">
   <meta property="og:image" content="https://raw.githubusercontent.com/claude-code-expert/.github/main/profile/assets/banner.png">
   <meta property="og:url" content="https://claude-code-expert.github.io">
@@ -144,7 +144,33 @@
       padding-top: 80px;
     }
 
-    .hero__inner { width: 100%; text-align: center; }
+    .hero__inner {
+      width: 100%; display: flex; align-items: center; gap: 56px;
+    }
+
+    .hero__book {
+      flex: 0 0 480px;
+      text-align: center;
+      opacity: 0; animation: fadeUp 0.6s ease forwards;
+    }
+
+    .hero__book img {
+      width: 100%; border-radius: var(--radius-lg);
+      box-shadow: 0 20px 60px rgba(56,189,248,0.12), 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    .hero__book-badge {
+      display: inline-block; margin-top: 20px;
+    }
+
+    .hero__book-badge img {
+      box-shadow: none; border-radius: 6px;
+      transition: opacity 0.2s ease;
+    }
+
+    .hero__book-badge:hover img { opacity: 0.85; }
+
+    .hero__text { flex: 1; text-align: left; }
 
     .hero__badge {
       display: inline-flex; align-items: center; gap: 8px;
@@ -192,13 +218,13 @@
     }
 
     .hero__desc {
-      max-width: 640px; margin: 0 auto 40px;
+      max-width: 640px; margin: 0 0 40px;
       font-size: 1.05rem; color: var(--text-muted);
       opacity: 0; animation: fadeUp 0.6s 0.24s ease forwards;
     }
 
     .hero__actions {
-      display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;
+      display: flex; flex-wrap: wrap; gap: 12px;
       margin-bottom: 56px;
       opacity: 0; animation: fadeUp 0.6s 0.32s ease forwards;
     }
@@ -595,6 +621,81 @@
       color: var(--accent); text-decoration: none;
     }
 
+    /* ── TOC ── */
+    .toc {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px;
+      margin-top: 40px;
+    }
+
+    .toc__part { }
+
+    .toc__part-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem; font-weight: 600;
+      color: var(--accent); text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding-bottom: 10px; margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .toc__chapter {
+      margin-bottom: 18px;
+    }
+
+    .toc__chapter-title {
+      font-weight: 700; font-size: 0.88rem;
+      color: var(--text); margin-bottom: 6px;
+    }
+
+    .toc__chapter-title span {
+      color: var(--accent); font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem; margin-right: 6px;
+    }
+
+    .toc__sections {
+      list-style: none; padding: 0;
+    }
+
+    .toc__sections li {
+      font-size: 0.8rem; color: var(--text-muted);
+      line-height: 1.9; padding-left: 12px;
+      position: relative;
+    }
+
+    .toc__sections li::before {
+      content: ''; position: absolute; left: 0; top: 50%;
+      width: 4px; height: 4px; border-radius: 50%;
+      background: var(--border-hover); transform: translateY(-50%);
+    }
+
+    .toc__toggle {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      margin-top: 32px; padding: 12px 28px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 11px; color: var(--text-secondary);
+      font-family: 'Noto Sans KR', sans-serif; font-size: 0.9rem; font-weight: 500;
+      cursor: pointer; transition: all 0.2s ease;
+    }
+
+    .toc__toggle:hover {
+      border-color: var(--border-hover); color: var(--text);
+      background: var(--surface2);
+    }
+
+    .toc__toggle svg {
+      width: 14px; height: 14px;
+      transition: transform 0.3s ease;
+    }
+
+    .toc__toggle.open svg { transform: rotate(180deg); }
+
+    .toc__detail { display: none; }
+    .toc__detail.open { display: grid; }
+
+    @media (max-width: 860px) {
+      .toc, .toc__detail { grid-template-columns: 1fr; }
+    }
+
     /* ── Animation ── */
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(18px); }
@@ -612,6 +713,11 @@
     @media (max-width: 860px) {
       section { padding: 60px 0; }
       .hero { min-height: auto; padding-top: 100px; padding-bottom: 40px; }
+      .hero__inner { flex-direction: column; text-align: center; gap: 32px; }
+      .hero__book { flex: 0 0 auto; max-width: 220px; }
+      .hero__text { text-align: center; }
+      .hero__desc { margin: 0 auto 40px; }
+      .hero__actions { justify-content: center; }
       .parts { grid-template-columns: 1fr; }
       .repo__top { flex-wrap: wrap; }
       .repo__right { flex-wrap: wrap; }
@@ -639,6 +745,7 @@
     <a href="/" class="nav__brand"><span>Claude Code</span> Expert</a>
     <div class="nav__links">
       <a href="#book" class="nav__link">책 소개</a>
+      <a href="#toc" class="nav__link">목차</a>
       <a href="#repos" class="nav__link">레포지토리</a>
       <a href="#guides" class="nav__link">가이드 문서</a>
       <a href="#authors" class="nav__link">저자 소개</a>
@@ -654,19 +761,27 @@
 <section class="hero">
   <div class="wrap">
     <div class="hero__inner">
-      <div class="hero__badge">한빛미디어 &middot; 2026.04.15 출간</div>
-      <h1 class="hero__title"><span>Claude Code Expert</span></h1>
-      <p class="hero__sub">AI와 함께하는 개발 — 원칙, 방법론, 그리고 실전 코드</p>
-      <p class="hero__desc">
-        단순한 도구 사용법이 아닌, AI 코딩 에이전트와 체계적으로 협업하는 방법론을 제시합니다.
-        도구는 바뀌어도 원칙은 변하지 않습니다.
-      </p>
-      <div class="hero__actions">
-        <a href="#repos" class="btn btn--primary">레포지토리 둘러보기</a>
-        <a href="https://github.com/claude-code-expert" class="btn btn--outline">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-          GitHub Organization
+      <div class="hero__book">
+        <img src="guides/cc-master.png" alt="클로드 코드 마스터 책 표지">
+        <a href="https://product.kyobobook.co.kr/detail/S000219725328" target="_blank" class="hero__book-badge">
+          <img src="https://img.shields.io/badge/Book-Claude_Code_Master-2E75B6?style=for-the-badge&logo=bookstack&logoColor=white" alt="클로드 코드 마스터 온라인 구매">
         </a>
+      </div>
+      <div class="hero__text">
+        <div class="hero__badge">한빛미디어 &middot; 2026.04.15 출간</div>
+        <h1 class="hero__title"><span>Claude Code Master</span></h1>
+        <p class="hero__sub">기획 &middot; 개발 &middot; 운영이 한 번에 끝나는 AI 에이전틱 코딩 워크플로</p>
+        <p class="hero__desc">
+          단순한 도구 사용법이 아닌, AI 코딩 에이전트와 체계적으로 협업하는 방법론을 제시합니다 —
+          명세 주도 개발(SDD), 테스트 주도 개발(TDD), 그리고 어떤 AI 도구를 사용하든 변하지 않는 체계적인 리뷰 프로세스까지.
+        </p>
+        <div class="hero__actions">
+          <a href="#repos" class="btn btn--primary">레포지토리 둘러보기</a>
+          <a href="https://github.com/claude-code-expert" class="btn btn--outline">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            GitHub Organization
+          </a>
+        </div>
       </div>
     </div>
   </div>
@@ -697,6 +812,171 @@
         <div class="part__num">03</div>
         <div class="part__title">실전편</div>
         <div class="part__desc">AWS Bedrock AI 챗봇 — 스트리밍, 컨텍스트 관리, Tool Use, 할루시네이션 대응</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- TOC -->
+<section id="toc">
+  <div class="wrap">
+    <div class="sh sh--center reveal">
+      <div class="sh__label">Table of Contents</div>
+      <h2 class="sh__title">목차 보기</h2>
+      <p class="sh__desc">12개 챕터, 3개 파트로 구성된 체계적인 커리큘럼</p>
+    </div>
+
+    <div class="toc reveal">
+      <!-- 1부 -->
+      <div class="toc__part">
+        <div class="toc__part-label">1부 &mdash; 시작하기 전에</div>
+        <div class="toc__chapter">
+          <div class="toc__chapter-title"><span>CH.1</span>AI 시대의 개발자 패러다임</div>
+          <ul class="toc__sections">
+            <li>1.1 개발자의 역할 변화</li>
+            <li>1.2 AI 코딩 어시스턴트란 무엇인가</li>
+            <li>1.3 클로드 코드 소개</li>
+            <li>1.4 더 많은 실험이 가능해진 시대</li>
+          </ul>
+        </div>
+        <div class="toc__chapter">
+          <div class="toc__chapter-title"><span>CH.2</span>클로드 코드 설치와 환경 구성</div>
+          <ul class="toc__sections">
+            <li>2.1 클로드 코드 개발 환경 설정하기</li>
+            <li>2.2 첫 번째 대화: Hello, World</li>
+            <li>2.3 클로드 모델 계열 이해하기</li>
+            <li>2.4 기본 명령어와 사용법 익히기</li>
+            <li>2.5 CLAUDE.md로 프로젝트 설정하기</li>
+            <li>2.6 Agent Skill 이해하기</li>
+            <li>2.7 Hook으로 워크플로 자동화하기</li>
+          </ul>
+        </div>
+        <div class="toc__chapter">
+          <div class="toc__chapter-title"><span>CH.3</span>AI와 함께하는 개발 방법론</div>
+          <ul class="toc__sections">
+            <li>3.1 왜 설계가 중요한가</li>
+            <li>3.2 작은 단위로 쪼개기의 힘</li>
+            <li>3.3 명확한 지시의 기술</li>
+            <li>3.4 매 단계 리뷰하기</li>
+            <li>3.5 AI에게 없는 것 — 개발자의 판단력</li>
+            <li>3.6 증강코딩과 TDD</li>
+            <li>3.7 클로드 코드에서 MCP 설정하기</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 2부 -->
+      <div class="toc__part">
+        <div class="toc__part-label">2부 &mdash; 기초편: 풀스택 TODO 앱</div>
+        <div class="toc__chapter">
+          <div class="toc__chapter-title"><span>CH.4</span>프로젝트 소개와 요건 정의</div>
+          <ul class="toc__sections">
+            <li>4.1 TODO 앱으로 배우는 풀스택 개발</li>
+            <li>4.2 요구사항 정의하기</li>
+            <li>4.3 클로드 코드와 함께 요건 문서 작성</li>
+            <li>4.4 명세서 설계와 TDD 방식으로 개발</li>
+            <li>4.5 SDD와 Spec Kit</li>
+          </ul>
+        </div>
+        <div class="toc__chapter">
+          <div class="toc__chapter-title"><span>CH.5</span>백엔드 구현</div>
+          <ul class="toc__sections">
+            <li>5.1 개발 환경 준비</li>
+            <li>5.2 SDD 워크플로로 API 구현하기</li>
+            <li>5.3 테스트로 명세 검증하기</li>
+            <li>5.4 API 검증과 마무리</li>
+          </ul>
+        </div>
+        <div class="toc__chapter">
+          <div class="toc__chapter-title"><span>CH.6</span>프런트엔드 개발</div>
+          <ul class="toc__sections">
+            <li>6.1 개발 환경과 구현 전략</li>
+            <li>6.2 컴포넌트 테스트 환경 구성</li>
+            <li>6.3 UI 컴포넌트 설계와 구현</li>
+            <li>6.4 API 연동과 상태 관리</li>
+            <li>6.5 컨테이너 조립과 페이지 통합</li>
+            <li>6.6 디자인 시스템을 이용한 UI 개선</li>
+            <li>6.7 프런트엔드 테스트 실행과 검증</li>
+          </ul>
+        </div>
+        <div class="toc__chapter">
+          <div class="toc__chapter-title"><span>CH.7</span>빌드와 배포</div>
+          <ul class="toc__sections">
+            <li>7.1 개발/스테이징/운영 서버 관리 전략</li>
+            <li>7.2 Vercel을 이용한 배포</li>
+            <li>7.3 Railway를 이용한 백엔드 배포</li>
+            <li>7.4 도메인 연결하기</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 3부 -->
+      <div class="toc__part">
+        <div class="toc__part-label">3부 &mdash; 실전편: AI 챗봇 앱</div>
+        <div class="toc__chapter">
+          <div class="toc__chapter-title"><span>CH.8</span>프로젝트 기획과 설계</div>
+          <ul class="toc__sections">
+            <li>8.1 AI 챗봇 프로젝트 개요</li>
+            <li>8.2 AWS Bedrock과 모델 선택</li>
+            <li>8.3 프로젝트 범위 결정</li>
+            <li>8.4 시스템 아키텍처 설계</li>
+            <li>8.5 API 설계</li>
+            <li>8.6 프런트엔드 UI 설계</li>
+            <li>8.7 CLAUDE.md 작성</li>
+            <li>8.8 TDD + 클로드 코드 워크플로</li>
+          </ul>
+        </div>
+        <div class="toc__chapter">
+          <div class="toc__chapter-title"><span>CH.9</span>AWS Bedrock 연동</div>
+          <ul class="toc__sections">
+            <li>9.1 AWS 계정과 IAM 설정</li>
+            <li>9.2 프로젝트 초기화</li>
+            <li>9.3 Bedrock 클라이언트 구현</li>
+            <li>9.4 스트리밍 응답 처리</li>
+            <li>9.5 에러 핸들링</li>
+          </ul>
+        </div>
+        <div class="toc__chapter">
+          <div class="toc__chapter-title"><span>CH.10</span>채팅 API 구현</div>
+          <ul class="toc__sections">
+            <li>10.1 Express 서버 설정</li>
+            <li>10.2 세션 관리</li>
+            <li>10.3 대화 히스토리 관리</li>
+            <li>10.4 시스템 프롬프트 설계</li>
+            <li>10.5 채팅 API 엔드포인트</li>
+            <li>10.6 통합 테스트</li>
+          </ul>
+        </div>
+        <div class="toc__chapter">
+          <div class="toc__chapter-title"><span>CH.11</span>Tool Use 구현</div>
+          <ul class="toc__sections">
+            <li>11.1 Tool Use 개념</li>
+            <li>11.2 도구 정의와 스키마</li>
+            <li>11.3 시간 조회 도구 구현</li>
+            <li>11.4 계산기 도구 구현</li>
+            <li>11.5 날씨 API 연동</li>
+            <li>11.6 다중 도구 처리</li>
+            <li>11.7 Tool Use 설계 고려사항</li>
+          </ul>
+        </div>
+        <div class="toc__chapter">
+          <div class="toc__chapter-title"><span>CH.12</span>챗봇 프런트엔드 개발</div>
+          <ul class="toc__sections">
+            <li>12.1 React 프로젝트 설정</li>
+            <li>12.2 채팅 UI 컴포넌트</li>
+            <li>12.3 스트리밍 응답 표시</li>
+            <li>12.4 Tool Use 결과 표시</li>
+            <li>12.5 마크다운 렌더링</li>
+            <li>12.6 에러 처리와 로딩 상태</li>
+            <li>12.7 반응형 디자인</li>
+            <li>12.8 App 컴포넌트 통합</li>
+            <li>12.9 풀스택 통합</li>
+            <li>12.10 디자인 개선: shadcn/ui 적용</li>
+            <li>12.11 프런트엔드 설계 고려사항</li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
@@ -828,7 +1108,7 @@
 <!-- Quote -->
 <div class="quote-block reveal">
   <p class="quote-block__text">"도구는 바뀌어도 원칙은 변하지 않는다."</p>
-  <p class="quote-block__sub">— Claude Code Expert</p>
+  <p class="quote-block__sub">— Claude Code Master</p>
 </div>
 
 <!-- Footer -->
@@ -836,7 +1116,7 @@
   <div class="wrap">
     <div class="footer__inner">
       <div class="footer__copy">
-        &copy; 2026 <a href="https://github.com/claude-code-expert">Claude Code Expert</a> &middot; 한빛미디어
+        &copy; 2026 <a href="https://github.com/claude-code-expert">Claude Code Master</a> &middot; 한빛미디어
       </div>
       <div class="footer__links">
         <a href="https://github.com/claude-code-expert">GitHub</a>
