@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evaluator 실물 코드 - 사용 가이드</title>
+<meta name="description" content="발표자료의 채점 모델을 그대로 구현한 Java·Python 참조 코드의 구성, 실행 방법, 슬라이드 대응표, 자기 프로젝트에 옮기는 절차.">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<style>
+  /* 폰트 선택 이유: 코드 블록과 산문이 번갈아 나오는 문서라, 본문은 한글 자간이 고른
+     Pretendard, 코드·점수는 자릿수 정렬이 필요해 JetBrains Mono 로 나눈다. */
+  :root {
+    --ink:#0F172A; --ink-mute:#475569; --ink-faint:#94A3B8;
+    --bg:#FFFFFF; --surface:#F8FAFC; --surface-2:#F1F5F9;
+    --border:#E2E8F0; --border-2:#CBD5E1; --accent:#0F766E;
+    --mono:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans:"Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family:var(--sans); font-size:16px; line-height:1.72; color:var(--ink); background:var(--bg); -webkit-font-smoothing:antialiased; }
+
+  /* 와이드 레이아웃 - 대응표와 코드가 본체라 고정 좁은 폭은 내용을 눌러 가독성을 해친다.
+     1125px 뷰포트에서 96vw = 1080px, 데스크톱 실효 폭 1080px 보장. */
+  .wrap { width:min(96vw,1680px); margin:0 auto; padding:56px 40px 96px; }
+  @media (max-width:1120px){ .wrap{ width:100%; padding:32px 20px 64px; } }
+
+  header.doc-head { border-bottom:1px solid var(--border); padding-bottom:26px; margin-bottom:34px; }
+  .eyebrow { font-family:var(--mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); margin:0 0 12px; }
+  h1 { font-size:32px; line-height:1.25; font-weight:700; margin:0 0 12px; letter-spacing:-.01em; }
+  .doc-sub { font-size:16px; color:var(--ink-mute); margin:0; max-width:92ch; }
+  .doc-meta { margin-top:22px; display:grid; grid-template-columns:repeat(3,1fr); border:1px solid var(--border); }
+  .doc-meta > div { padding:12px 14px; border-right:1px solid var(--border); }
+  .doc-meta > div:last-child { border-right:0; }
+  .doc-meta dt { font-family:var(--mono); font-size:11px; color:var(--ink-faint); letter-spacing:.08em; text-transform:uppercase; margin:0 0 4px; }
+  .doc-meta dd { margin:0; font-size:15px; }
+
+  h2 { font-size:21px; font-weight:700; margin:56px 0 6px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+  h2 .part { font-family:var(--mono); font-size:12px; color:var(--accent); margin-right:10px; }
+  h3 { font-size:17px; font-weight:600; margin:32px 0 10px; }
+  h4 { font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); margin:22px 0 6px; font-weight:400; }
+  p { margin:0 0 12px; }
+  .lead { font-size:15px; color:var(--ink-mute); margin:0 0 18px; }
+
+  table { width:100%; border-collapse:collapse; margin:14px 0 20px; font-size:15px; }
+  th, td { border:1px solid var(--border); padding:10px 13px; vertical-align:top; text-align:left; }
+  th { background:var(--surface); font-weight:600; font-size:13.5px; }
+  tbody tr:nth-child(even) { background:var(--surface); }
+  td.n, .n { font-family:var(--mono); font-size:13.5px; white-space:nowrap; }
+  td.n b { color:var(--ink); }
+
+  code { font-family:var(--mono); font-size:.9em; background:var(--surface); border:1px solid var(--border); padding:1px 5px; }
+  pre { font-family:var(--mono); font-size:13.5px; line-height:1.62; background:var(--surface); border:1px solid var(--border); padding:14px 16px; overflow-x:auto; margin:10px 0 18px; }
+  pre code { background:none; border:0; padding:0; font-size:inherit; }
+
+  ul, ol { padding-left:22px; margin:8px 0 16px; }
+  li { margin:5px 0; }
+
+  .note { border:1px solid var(--border-2); background:var(--surface); padding:14px 18px; margin:20px 0; font-size:15px; }
+  .note .label { display:inline-block; font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-mute); margin-bottom:6px; }
+  .note p:last-child { margin-bottom:0; }
+
+  .step { border:1px solid var(--border); margin:16px 0; }
+  .step-head { padding:10px 16px; background:var(--surface); border-bottom:1px solid var(--border); font-weight:600; font-size:15px; }
+  .step-head .num { font-family:var(--mono); color:var(--accent); margin-right:8px; }
+  .step-body { padding:14px 16px; }
+  .step-body > :last-child { margin-bottom:0; }
+
+  footer.doc-foot { margin-top:64px; padding-top:22px; border-top:1px solid var(--border); font-size:13px; color:var(--ink-faint); font-family:var(--mono); }
+  a { color:var(--accent); text-decoration:none; border-bottom:1px solid var(--border); }
+  a:hover { border-bottom-color:var(--accent); }
+
+  @media print {
+    body { font-size:11pt; }
+    .wrap { width:auto; padding:0; }
+    table, pre, .note, .step { break-inside:avoid; }
+    h2 { break-after:avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc-head">
+    <p class="eyebrow">level 9 · evaluator 실물 코드</p>
+    <h1>Evaluator 실물 코드 - 사용 가이드</h1>
+    <p class="doc-sub">
+      발표자료가 설명하는 채점 모델(100점 채점표 · 거부권 · 5축 루브릭 · 재작업 루프)을
+      실제로 돌아가는 Java·Python 코드로 옮긴 것이다. 슬라이드의 숫자와 코드의 숫자가 같고,
+      테스트가 그 일치를 검증한다. 빌드 도구·테스트 프레임워크·API 키가 필요 없다.
+    </p>
+    <dl class="doc-meta">
+      <div><dt>저장소</dt><dd><a href="https://github.com/claude-code-expert/carve-harness" target="_blank" rel="noopener">claude-code-expert/carve-harness</a></dd></div>
+      <div><dt>경로</dt><dd><code>docs/evaluator/deck-example/</code></dd></div>
+      <div><dt>언어</dt><dd>Java (JDK 11+) · Python 3</dd></div>
+    </dl>
+  </header>
+
+  <div class="note">
+    <span class="label">기존 예시와의 관계</span>
+    <p>
+      저장소에는 이미 <code>java-example</code> · <code>python-example</code> 이 있다. 그것들은
+      <b>LLM-Judge 한 층</b>을 보여주는 좋은 샘플이지만 채점이 1/3/5점이라, 발표자료의
+      <b>100점 만점 · 90점 합격</b>과 숫자가 어긋난다. 이 <code>deck-example</code> 은 그 위에
+      <b>채점표 전체</b>를 보여주며, 기존 예시를 대체하지 않고 나란히 놓인다.
+    </p>
+  </div>
+
+  <!-- ═══════════ PART 1 ═══════════ -->
+  <section>
+    <h2><span class="part">PART 1</span>무엇이 들어 있나</h2>
+
+    <table>
+      <thead><tr><th style="width:30%">파일</th><th>역할</th></tr></thead>
+      <tbody>
+        <tr><td class="n">goldenset/coupon-api.json</td><td>발표자료 워크스루의 그 케이스. 항목 4개, 합격선 95. <b>사람이 검수한 문항</b>이다</td></tr>
+        <tr><td class="n">{java,python}/ScoreCard</td><td>빌드 건강도 채점표 - 100점 만점, G1~G3 거부권. <b>LLM을 호출하지 않는다</b></td></tr>
+        <tr><td class="n">{java,python}/RubricJudge</td><td>5축 루브릭 - exists·match·test·contract·no_regress, 임계 95</td></tr>
+        <tr><td class="n">{java,python}/ScoreCardTest</td><td><b>채점기를 채점하는 테스트</b> - 87p 의심 순서를 코드로</td></tr>
+      </tbody>
+    </table>
+
+    <h3>실행</h3>
+    <p>의존성이 없다. 클론하고 한 줄이면 돈다.</p>
+<pre><code>git clone https://github.com/claude-code-expert/carve-harness
+cd carve-harness/docs/evaluator/deck-example
+
+cd java   &amp;&amp; java ScoreCardTest.java      # JDK 11+ 단일 파일 실행
+cd python &amp;&amp; python3 test_scorecard.py    # 표준 라이브러리만</code></pre>
+    <p>실패가 있으면 <code>exit 1</code> 로 끝난다. CI 게이트에 그대로 걸 수 있다.</p>
+  </section>
+
+  <!-- ═══════════ PART 2 ═══════════ -->
+  <section>
+    <h2><span class="part">PART 2</span>슬라이드 ↔ 코드 대응표</h2>
+    <p class="lead">발표 중 "이 부분이 코드로는 여기입니다"라고 짚을 수 있게 1:1로 맞췄다.</p>
+
+    <table>
+      <thead><tr><th style="width:90px">슬라이드</th><th style="width:34%">개념</th><th>구현</th></tr></thead>
+      <tbody>
+        <tr><td class="n"><b>66~68</b></td><td>100점 만점 · 90점 합격</td><td class="n">ScoreCard.WEIGHTS (합 100) · PASS_RATIO = 0.9</td></tr>
+        <tr><td class="n"><b>66~68</b></td><td>G1·G2·G3 거부권</td><td class="n">ScoreCard.VETO_ITEMS - 하나라도 0이면 총점 무관 FAIL</td></tr>
+        <tr><td class="n"><b>66</b></td><td>못 잰 항목은 분모에서 제외</td><td class="n">Measurement.value == null → skipped, max 축소</td></tr>
+        <tr><td class="n"><b>62~64</b></td><td>결정론 층을 먼저 두껍게</td><td>ScoreCard 는 LLM 을 호출하지 않는다</td></tr>
+        <tr><td class="n"><b>68</b></td><td>5축 루브릭 · 임계 95</td><td class="n">RubricJudge.AXES · DEFAULT_THRESHOLD</td></tr>
+        <tr><td class="n"><b>72~73</b></td><td>거짓 완료 차단</td><td>test 축은 실행 출력으로만 → 미실행 시 상한 75</td></tr>
+        <tr><td class="n"><b>74~75</b></td><td>쿠폰 API 워크스루</td><td class="n">97/70/92/100 → 97/96/97/100 재현</td></tr>
+        <tr><td class="n"><b>75</b></td><td>통과 항목은 건드리지 않는다</td><td class="n">loopStatus().rework 에 미달 항목만</td></tr>
+        <tr><td class="n"><b>87</b></td><td>채점기부터 의심</td><td class="n">96.12 vs 96.120 버그 재현 테스트</td></tr>
+        <tr><td class="n"><b>87</b></td><td>극단 점수는 경보</td><td class="n">alarm() - 전원 0% / 전원 100% 판정</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══════════ PART 3 ═══════════ -->
+  <section>
+    <h2><span class="part">PART 3</span>설계에서 눈여겨볼 세 가지</h2>
+
+    <h3>1. 거부권은 한 줄이다</h3>
+    <p>총점이 합격선을 넘어도 안전 항목이 0이면 실패다. "거의 다 됐다"를 산술적으로 없애는 자리다.</p>
+<pre><code>boolean veto = items.get("g1_build") == 0
+            || items.get("g2_test")  == 0
+            || items.get("g3_safety") == 0;
+
+verdict = veto ? FAIL : (total / max &gt;= 0.9 ? PASS : FAIL);</code></pre>
+    <p class="n">테스트로 고정: 안전 0점 → 총점 <b>85</b> → <b>FAIL</b>. lint 0점 → 총점 <b>90</b> → <b>PASS</b>(거부권 아님).</p>
+
+    <h3>2. <code>test</code> 축이 거짓 완료를 막는다</h3>
+    <p>
+      <code>test</code> 는 <b>실행 출력에서만</b> 채워진다. 테스트를 돌리지 않으면 0점이고,
+      나머지 네 축을 만점 받아도 합이 <b>75</b> 라 임계 95를 넘을 수 없다.
+    </p>
+<pre><code>exists 25 + match 25 + test  0 + contract 15 + no_regress 10 = 75   &lt; 95</code></pre>
+    <p>
+      게이트에 "테스트를 돌렸는지 확인하라"는 규칙을 <b>따로 넣지 않아도 배점 자체가 막는다.</b>
+      규칙을 늘리는 대신 구조로 강제하는 예다.
+    </p>
+
+    <h3>3. 못 잰 것과 나쁜 것은 다르다</h3>
+    <p>
+      커버리지 리포트가 없을 때 0점을 주면 억울한 감점이 되고, 만점을 주면 조용한 통과가 된다.
+      그래서 <b>분모에서 뺀다</b>. <code>skipped</code> 목록에 남으므로 무엇을 못 쟀는지도 드러난다.
+    </p>
+<pre><code>전 항목 측정  → 100/100  PASS
+커버리지 없음 →  95/95   PASS     (coverage 는 skipped)
+아무것도 없음 →   0/0    UNABLE   (PASS 아님 - fail-closed)</code></pre>
+  </section>
+
+  <!-- ═══════════ PART 4 ═══════════ -->
+  <section>
+    <h2><span class="part">PART 4</span>워크스루가 재현되는지 보는 법</h2>
+    <p class="lead">
+      발표자료 74~75p 의 점수표가 코드에서 그대로 나온다. 테스트가 그 숫자를 단언으로 고정하고 있어,
+      구현이 바뀌면 테스트가 깨진다.
+    </p>
+
+    <table>
+      <thead><tr><th style="width:36%">채점 항목</th><th style="width:110px">1회차</th><th style="width:110px">2회차</th><th>재작업 지시</th></tr></thead>
+      <tbody>
+        <tr><td class="n">coupon-applies</td><td class="n">97 ✓</td><td class="n">97 유지</td><td>-</td></tr>
+        <tr><td class="n">coupon-no-reuse</td><td class="n"><b>70</b> ✗</td><td class="n">96 ✓</td><td>중복 사용 테스트가 아예 없음 → test 축 0점</td></tr>
+        <tr><td class="n">coupon-expiry</td><td class="n"><b>92</b> ✗</td><td class="n">97 ✓</td><td>만료 경계 미검증 → match 축 미달</td></tr>
+        <tr><td class="n">coupon-response-shape</td><td class="n">100 ✓</td><td class="n">100 유지</td><td>-</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      1회차에서 게이트는 <code>BLOCKED</code> 이고 재작업 대상은 <b>미달 2개뿐</b>이다.
+      통과한 항목은 손대지 않는다 - 전체 재생성이 아니라 미달만 고치니 빠르고, 이미 좋은 것을 망치지 않는다.
+    </p>
+
+    <div class="note">
+      <span class="label">92점도 차단이다</span>
+      <p>
+        <code>coupon-expiry</code> 가 92점으로 막히는 것이 이 예제의 핵심 장면이다.
+        "거의 됐다"는 판정에 없다. 합격선 아래는 전부 같은 <b>미달</b>이다.
+      </p>
+    </div>
+
+    <h3>채점기 버그 재현 - 87p</h3>
+    <p>
+      같은 답을 두고 채점기만 바꿨을 때 통과율이 어떻게 변하는지 보여준다.
+      "채점기부터 의심하라"가 왜 순서 1번인지가 여기서 드러난다.
+    </p>
+<pre><code>정답 96.12 에 대한 응답들:  "96.120"  " 96.12"  "96.12"  "100.0"
+
+문자열 비교 채점기   1/4 통과      ← 에이전트가 틀린 것처럼 보인다
+숫자 비교 채점기     4/4 통과      ← 답은 처음부터 맞았다</code></pre>
+  </section>
+
+  <!-- ═══════════ PART 5 ═══════════ -->
+  <section>
+    <h2><span class="part">PART 5</span>자기 프로젝트에 옮기는 절차</h2>
+
+    <div class="step">
+      <div class="step-head"><span class="num">01</span>골든셋을 자기 도메인으로 바꾼다</div>
+      <div class="step-body">
+        <p><code>goldenset/coupon-api.json</code> 을 복사해 항목을 자기 것으로 교체한다. 항목마다 <code>claim</code>(무엇을 했다고 주장하는가)과 <code>acceptance</code>(무엇이 충족의 증거인가)를 쓴다.</p>
+        <p><b>케이스는 사람이 검수한다.</b> 에이전트가 혼자 만들면 자기가 이미 통과하는 것만 담아 지표가 무의미해진다.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><span class="num">02</span>측정 어댑터에 자기 툴체인을 연결한다</div>
+      <div class="step-body">
+        <p>실제로 명령을 돌리고 종료 코드를 넘긴다. 이 부분만 바꾸면 언어·스택과 무관하게 동작한다.</p>
+<pre><code>from_exit_code(run("./gradlew test"), "gradlew test")     # G2
+from_exit_code(run("./gradlew spotlessCheck"), "spotless") # lint
+from_coverage(parse_jacoco(), minimum=0.8)                 # coverage</code></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><span class="num">03</span>못 돌리는 항목은 <code>null</code> 을 넘긴다</div>
+      <div class="step-body">
+        <p>툴체인이 없거나 리포트가 없으면 <b>0점이 아니라 <code>null</code></b> 이다. 그래야 <code>skipped</code> 로 가고 분모에서 빠진다. 여기를 0점으로 처리하면 팀이 채점을 불신하게 되고, 만점으로 처리하면 조용한 통과가 생긴다.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><span class="num">04</span>루프를 돈다</div>
+      <div class="step-body">
+        <p><code>loopStatus()</code> 가 <code>RELEASED</code> 를 돌려줄 때까지 <b>미달 항목만</b> 재작업한다. 항목당 재시도 상한(3회)을 두고, 넘으면 사람에게 에스컬레이션한다.</p>
+<pre><code>S1 분해   → S2 구현 → S3 채점 → S4 미달만 되먹임 → S2
+                                 ↓ 전 항목 통과
+                              S5 종료</code></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><span class="num">05</span>CI에 건다</div>
+      <div class="step-body">
+        <p>두 스크립트 모두 실패 시 <code>exit 1</code> 이므로 워크플로 스텝에 그대로 넣으면 된다. 채점기 자체가 깨졌을 때 조용히 통과하지 않는 것이 요점이다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ PART 6 ═══════════ -->
+  <section>
+    <h2><span class="part">PART 6</span>발표에서 쓰는 법</h2>
+
+    <p>이 코드가 답이 되는 사전 질문이 여러 건 있다.</p>
+    <table>
+      <thead><tr><th style="width:110px">질문</th><th style="width:26%">요지</th><th>이 코드에서 보여줄 것</th></tr></thead>
+      <tbody>
+        <tr><td class="n">Q01</td><td>정량 평가 프레임워크</td><td>채점표 배점과 거부권을 코드로 - 슬라이드 숫자가 그대로 돈다</td></tr>
+        <tr><td class="n">Q05-2 · Q06-2</td><td>Evaluator 자체의 신뢰성</td><td>채점기를 채점하는 테스트 · 96.12 버그 재현</td></tr>
+        <tr><td class="n">Q13</td><td>핵심 정량 지표</td><td>7개 항목 배점과 skipped 처리</td></tr>
+        <tr><td class="n">Q07</td><td>주니어의 Evaluator 설계</td><td>도메인 지식 없이도 채울 수 있는 결정론 층이 어디까지인지</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <span class="label">추천 시연 흐름 - 2분</span>
+      <p>
+        ① <code>python3 test_scorecard.py</code> 를 그대로 실행해 전 항목 PASS 를 보여준다.
+        ② 워크스루 섹션의 <code>97/70/92/100 → 97/96/97/100</code> 출력이 슬라이드 표와 같음을 짚는다.
+        ③ 마지막 "채점기 버그 재현" 출력(<code>1/4 → 4/4</code>)으로 87p 의심 순서를 닫는다.
+      </p>
+    </div>
+  </section>
+
+  <footer class="doc-foot">
+    docs/keynote/level9-evaluator-code-guide.html ·
+    코드 <a href="https://github.com/claude-code-expert/carve-harness/tree/main/docs/evaluator/deck-example" target="_blank" rel="noopener">carve-harness/docs/evaluator/deck-example</a> ·
+    덱 91장 기준
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,2049 @@
+<!DOCTYPE html>
+<html lang="ko" data-template="study">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>쿠버네티스 관측성 스터디 — kind · 프로메테우스 · 그라파나 · 로키 — 11장 실습</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&amp;display=swap" />
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#e9eaec;overflow:hidden;
+            font-family:'Pretendard','Pretendard Variable',-apple-system,sans-serif}
+
+  /* 뷰포트에 맞춰 1280×720 을 통째로 스케일한다 */
+  #stage{position:fixed;inset:0;display:grid;place-items:center}
+  #deck{position:relative;width:1280px;height:720px;transform-origin:center center;
+        background:#fff;border:1px solid #d8dbe0}
+
+  .slide{position:absolute;inset:0;display:none;overflow:hidden;background:#fff}
+  .slide.on{display:block}
+
+  #prog{position:absolute;left:0;bottom:0;height:4px;background:#1a4fa0;z-index:5}
+  #hud{position:fixed;right:14px;top:10px;font-family:'JetBrains Mono',monospace;
+       font-size:12px;color:#585f6b;user-select:none;z-index:21}
+
+  @media print{
+    html,body{overflow:visible;background:#fff}
+    #stage{position:static;display:block}
+    #deck{transform:none!important;border:0}
+    .slide{display:block!important;position:relative;page-break-after:always}
+    #hud,#prog{display:none!important}
+  }
+
+/* study — 관측성 스터디 장표 테마
+ *
+ * 정본: docs/ppt/GUIDE.md. 팔레트 6색과 타이포 스케일이 거기서 온다.
+ * 저작 좌표는 1280×720이고 export에서 1.5× 되어 1920×1080이 된다. GUIDE의
+ * 치수는 1920 기준이라 여기서는 전부 ×0.667 한 값을 쓴다 (여백 80→53px 등).
+ *
+ * 폰트는 Pretendard(본문) + JetBrains Mono(코드). 기본값(Inter/system-ui)으로
+ * 수렴하지 않은 이유 — 이 덱은 한글 본문에 영문 식별자(ServiceMonitor,
+ * imagePullPolicy)가 계속 섞인다. Pretendard는 한글 자소 폭이 고르고 라틴
+ * 글리프가 같은 리듬으로 붙어서 그 혼합을 흔들림 없이 받는다. 코드와 출력은
+ * 자릿수 정렬이 판독의 전부라 등폭이 필수다.
+ */
+
+[data-template="study"] {
+  /* GUIDE 팔레트 — 이 여섯 개 밖의 색을 본문에 쓰지 않는다 */
+  --text:    #15181d;  /* 제목 · 본문 */
+  --muted:   #585f6b;  /* 캡션 · 라벨 · 도판의 선 */
+  --border:  #d8dbe0;  /* 표 테두리 · 구분선 */
+  --surface: #f5f6f7;  /* 코드 블록 · 강조 박스 배경 */
+  --accent:  #1a4fa0;  /* 지금 말하는 것 하나 — 장표당 1회 */
+  --warn:    #8f4408;  /* 함정 · 정정 · 실패 */
+  --bg:      #ffffff;
+
+  /* 타이포 스케일 (@1280). GUIDE @1920 값의 ×0.667 */
+  --fs-title: 52px;
+  --fs-lead:  32px;
+  --fs-body:  26px;
+  --fs-code:  24px;
+  --fs-cap:   21px;
+
+  --font-sans: 'Pretendard', 'Pretendard Variable', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* ── 슬라이드 셸 ───────────────────────────────────────────────
+   하단 80px(=GUIDE 120px)은 강의실에서 가려지는 구간이라 비워 둔다.
+   푸터는 그 비워 둔 영역 안에 얹는다 — 가려져도 잃을 것이 없는 정보만. */
+[data-template="study"].slide {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-weight: 400;
+}
+
+[data-template="study"] .slide-inner {
+  position: absolute;
+  inset: 53px 53px 80px;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-template="study"] .slide-footer {
+  position: absolute;
+  left: 53px; right: 53px; bottom: 26px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: var(--fs-cap);
+  color: var(--muted);
+}
+[data-template="study"] .slide-footer-left { font-family: var(--font-sans); }
+[data-template="study"] .slide-footer-right { font-family: var(--font-mono); }
+
+/* ── 제목부 ─────────────────────────────────────────────────── */
+[data-template="study"] .kicker {
+  font-size: var(--fs-cap);
+  color: var(--muted);
+  letter-spacing: .04em;
+  margin-bottom: 10px;
+}
+
+[data-template="study"] h2 {
+  font-size: var(--fs-title);
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -.01em;
+  margin: 0 0 20px;
+}
+
+/* 제목 안에서 딱 한 곳을 강조할 때. 두 곳을 강조하면 어느 쪽도 강조가 아니다. */
+[data-template="study"] h2 .hi { color: var(--accent); }
+[data-template="study"] .warn { color: var(--warn); }
+
+/* ── 본문 ──────────────────────────────────────────────────── */
+[data-template="study"] .body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* 넘치면 제목과 말할 것을 덮는다. 잘라 내면 검사에서 수치로 잡히지만
+     겹치면 스크린샷상 '그럴듯하게' 보여서 놓친다. 그래서 자른다. */
+  overflow: hidden;
+}
+
+/* 텍스트 전용 장표의 주장 문구 */
+[data-template="study"] .lead {
+  font-size: var(--fs-lead);
+  line-height: 1.5;
+  color: var(--text);
+  max-width: 30ch;
+}
+[data-template="study"] .lead.wide { max-width: none; }
+
+/* 좌우 두 칸 */
+[data-template="study"] .cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: start;
+}
+[data-template="study"] .col-head {
+  font-size: var(--fs-cap);
+  color: var(--muted);
+  letter-spacing: .04em;
+  margin-bottom: 8px;
+}
+
+/* ── 도판 ──────────────────────────────────────────────────── */
+[data-template="study"] .fig {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+}
+[data-template="study"] .fig svg {
+  display: block;
+  width: 100%;
+  max-width: 1067px;   /* GUIDE 1600px @1920 */
+  height: auto;
+  max-height: 100%;
+}
+[data-template="study"] .fig img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  /* PNG 5종은 954px 원본이다. 확대하면 뭉개지므로 늘리지 않는다. */
+  width: auto; height: auto;
+}
+[data-template="study"] .fig-cap {
+  font-size: var(--fs-cap);
+  color: var(--muted);
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* ── 표 ───────────────────────────────────────────────────────
+   행을 줄이지 않는다(GUIDE). 안 들어가면 장표를 쪼갠다. */
+[data-template="study"] table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-body);
+  line-height: 1.4;
+}
+[data-template="study"] th,
+[data-template="study"] td {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+[data-template="study"] th {
+  font-size: var(--fs-cap);
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: .03em;
+  border-bottom: 1px solid var(--muted);
+  white-space: nowrap;
+}
+[data-template="study"] tr:last-child td { border-bottom: none; }
+
+/* 행이 많은 표. 행을 줄이는 대신(GUIDE 금지) 여백과 글자를 한 단계 내린다.
+   .dense 는 5행 이상일 때 빌더가 붙인다. */
+[data-template="study"] table.dense { font-size: 23px; }
+[data-template="study"] table.dense th,
+[data-template="study"] table.dense td { padding: 7px 12px; }
+[data-template="study"] table.dense th { font-size: 19px; }
+[data-template="study"] td.num,
+[data-template="study"] td.mono { font-family: var(--font-mono); white-space: nowrap; }
+
+/* 열이 넷 이상이거나 셀이 길어 격자로는 못 읽는 표는 행 카드로 편다.
+   격자를 유지하려고 글자를 22pt 밑으로 내리는 것보다 낫다. */
+[data-template="study"] .cards {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+[data-template="study"] .card {
+  border: 1px solid var(--border);
+  padding: 10px 16px;
+}
+[data-template="study"] .card-h {
+  font-size: 23px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+[data-template="study"] .card-row {
+  display: grid;
+  grid-template-columns: 186px 1fr;
+  gap: 10px;
+  font-size: 20px;
+  line-height: 1.4;
+  padding: 1px 0;
+}
+[data-template="study"] .cards.dense { gap: 7px; }
+[data-template="study"] .cards.dense .card { padding: 8px 14px; }
+[data-template="study"] .cards.dense .card-h { font-size: 21px; }
+[data-template="study"] .cards.dense .card-row { font-size: 19px; line-height: 1.35; }
+
+[data-template="study"] .card-k { color: var(--muted); }
+[data-template="study"] .card-v code,
+[data-template="study"] .card-v .mono { font-family: var(--font-mono); }
+
+/* ── 코드 · 실행 결과 ──────────────────────────────────────────
+   명령과 출력은 다른 블록으로 나눈다. 프롬프트 기호($)는 붙이지 않는다. */
+[data-template="study"] pre {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 18px 22px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-code);
+  line-height: 1.45;
+  white-space: pre;
+  overflow: hidden;
+  margin: 0;
+}
+[data-template="study"] pre + pre { margin-top: 12px; }
+
+/* 판정 줄에만 강조색이 간다. 나머지 출력은 본문색 그대로. */
+[data-template="study"] pre .verdict { color: var(--accent); font-weight: 600; }
+[data-template="study"] pre .dim { color: var(--muted); }
+[data-template="study"] pre .bad { color: var(--warn); }
+
+/* 잘라낸 코드임을 표시하는 줄 */
+[data-template="study"] pre .elide { color: var(--muted); }
+
+/* 출력 아래 붙는 판정 문장 */
+[data-template="study"] .verdict-note {
+  font-size: var(--fs-body);
+  line-height: 1.45;
+  margin-top: 14px;
+  padding-left: 14px;
+  border-left: 3px solid var(--accent);
+}
+[data-template="study"] .verdict-note b { color: var(--accent); font-weight: 600; }
+
+/* ── 말할 것 — 장표 하나의 주장 한 문장 ────────────────────────
+   발표자 노트를 옮겨 붙이는 자리가 아니다. 한 문장을 넘기지 않는다. */
+[data-template="study"] .key {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-body);
+  line-height: 1.45;
+  color: var(--text);
+}
+[data-template="study"] .key b { color: var(--accent); font-weight: 600; }
+
+/* ── 표지 · 챕터 타이틀 · 로드맵 ─────────────────────────────────
+   클래스 이름은 단독 실행본(docs/html/observability-study-slides.html)과
+   공유한다. 두 산출물이 같은 CSS 를 쓰므로 한쪽만 고쳐지는 일이 없다. */
+/* .title / .sec 변형은 슬라이드 루트와 `.slide-inner` 양쪽에 붙는다.
+   `.slide-inner` 를 기준으로 쓰면 `data-template` 이 슬라이드에 붙든(에디터)
+   `<html>` 에 붙든(단독 실행본) 같은 셀렉터 하나로 걸린다. */
+[data-template="study"] .slide-inner.title { justify-content: center; }
+[data-template="study"] .slide-inner.title h1 {
+  font-size: 66px; font-weight: 700; line-height: 1.16; letter-spacing: -.03em;
+}
+[data-template="study"] .slide-inner.title .sub {
+  font-size: 30px; color: var(--muted); margin-top: 22px; letter-spacing: .01em;
+}
+[data-template="study"] .slide-inner.title .meta {
+  font-family: var(--font-mono); font-size: 19px; color: var(--muted); margin-top: 44px;
+}
+
+/* 챕터 타이틀 — 큰 번호 + 그 장의 장표 미리보기 */
+[data-template="study"] .slide-inner.sec {
+  justify-content: center; align-items: flex-start;
+}
+[data-template="study"] .slide-inner.sec .cnum {
+  font-family: var(--font-mono); font-size: 120px; font-weight: 700;
+  color: var(--accent); line-height: 1; letter-spacing: -.02em; margin-bottom: 20px;
+}
+[data-template="study"] .slide-inner.sec h1 {
+  font-size: 52px; font-weight: 700; line-height: 1.16; letter-spacing: -.025em;
+}
+[data-template="study"] .slide-inner.sec .sub {
+  font-size: 21px; color: var(--muted); margin-top: 24px;
+  line-height: 1.75; max-width: 1000px;
+}
+[data-template="study"] .slide-inner.sec .sub span {
+  font-family: var(--font-mono); color: var(--muted); margin-right: 10px;
+}
+
+/* 로드맵 — 11개 장의 의존 흐름 */
+[data-template="study"] .roadmap {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; font-size: 19px;
+}
+[data-template="study"] .rm-item {
+  border: 1px solid var(--border); padding: 12px 14px; line-height: 1.4;
+}
+[data-template="study"] .rm-item .n {
+  font-family: var(--font-mono); color: var(--muted);
+  display: block; margin-bottom: 4px; font-size: 17px;
+}
+
+/* 굵기만으로 위계를 만든다 — GUIDE: "위계는 크기·굵기·여백·정렬로 만든다.
+   색·효과로 만들지 않는다." 강조색은 제목의 .hi 와 판정에만 쓴다. */
+[data-template="study"] .lead b { font-weight: 700; }
+[data-template="study"] .lead .d {
+  display: block; font-size: 24px; color: var(--muted);
+  margin-top: 22px; line-height: 1.6;
+}
+[data-template="study"] code {
+  font-family: var(--font-mono); font-size: .9em;
+  background: #15181d0d; padding: 2px 7px; border-radius: 4px;
+}
+[data-template="study"] h3 {
+  font-size: 21px; color: var(--accent); margin: 6px 0 10px; font-weight: 600;
+}
+</style>
+</head>
+<body>
+<div id="stage"><div id="deck">
+<section class="slide title">
+<div class="slide-inner title"><div class="kicker">관측성 실습 시리즈</div><h1>쿠버네티스 관측성 스터디</h1><div class="sub">kind · 프로메테우스 · 그라파나 · 로키 — 11장 실습</div><div class="meta">kind v0.32.0 · kube-prometheus-stack 88.3.0 · Loki 3.x</div></div>
+<div class="slide-footer"><span class="slide-footer-left">OVERVIEW</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">전체 흐름</div><h2>앞 장의 산출물이 다음 장의 <span class="hi">입력</span>이 된다</h2><div class="body"><div class="roadmap"><div class="rm-item"><span class="n">00</span>환경과 버전 고정</div><div class="rm-item"><span class="n">01</span>kind 클러스터 구축</div><div class="rm-item"><span class="n">02</span>계측 가능한 애플리케이션</div><div class="rm-item"><span class="n">03</span>컨테이너화와 배포</div><div class="rm-item"><span class="n">04</span>프로메테우스 스택 설치</div><div class="rm-item"><span class="n">05</span>그라파나와 대시보드</div><div class="rm-item"><span class="n">06</span>앱 메트릭과 PromQL</div><div class="rm-item"><span class="n">07</span>대시보드와 알림</div><div class="rm-item"><span class="n">08</span>로그 수집 — Loki + Alloy</div><div class="rm-item"><span class="n">09</span>운영과 모범 사례</div><div class="rm-item"><span class="n">10</span>테스팅과 카오스 실험</div></div></div><div class="key">건너뛰면 사전 조건이 깨진다. 마지막 10장은 앞의 열 장이 실제로 쓸모 있는지 판정하는 장이다.</div></div>
+<div class="slide-footer"><span class="slide-footer-left">AGENDA</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide sec">
+<div class="slide-inner sec"><div class="cnum">00</div><h1>환경과 버전 고정</h1><div class="sub"><span>00-01</span>왜 버전을 고정하나<br><span>00-02</span>메트릭이 이상을 알려주고, 로그가 이유를 말해준다<br><span>00-03</span>폐쇄형과 개방형<br><span>00-04</span>메트릭은 당겨 오고 로그는 밀어 보낸다<br><span>00-05</span>버전 매트릭스<br><span>00-06</span>사전 점검<br></div></div>
+<div class="slide-footer"><span class="slide-footer-left">SECTION 00</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">00 · 환경과 버전 고정</div><h2>왜 버전을 고정하나</h2><div class="body"><div class="lead">8명이 같은 화면을 보려면<br><b>같은 숫자</b>여야 한다</div></div><div class="key">스터디 6주 동안 차트는 3~4번 올라간다. 한 사람이 88.3.0으로, 다른 사람이 90.x로 설치하면 대시보드 JSON이 서로 맞지 않는다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">00 · 환경과 버전 고정</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">00 · 환경과 버전 고정</div><h2>메트릭이 이상을 알려주고, 로그가 이유를 말해준다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 268" role="img" aria-label="왼쪽 지연 그래프의 급등과 오른쪽 그 시각의 로그 한 줄">
+  <rect width="960" height="268" fill="#ffffff"/>
+  <defs><marker id="gap-00-02-a0002" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1a4fa0"/></marker></defs>
+  <text x="24" y="30" font-family="ui-monospace,monospace" font-size="16" fill="#585f6b" text-anchor="start" font-weight="400">메트릭 — 무엇이</text>
+  <rect x="24" y="46" width="420" height="200" rx="0" fill="#f5f6f7" stroke="#d8dbe0" stroke-width="1.5"/>
+  <line x1="64" y1="70" x2="64" y2="216" stroke="#585f6b" stroke-width="1.2"/>
+  <line x1="64" y1="216" x2="424" y2="216" stroke="#585f6b" stroke-width="1.2"/>
+  <polyline points="64,190 104,188 144,191 184,187 224,189 264,186 304,100 314,86 324,150 364,188 404,190 420,189" fill="none" stroke="#1a4fa0" stroke-width="2"/>
+  <line x1="64" y1="120" x2="424" y2="120" stroke="#8f4408" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="420" y="114" font-family="ui-monospace,monospace" font-size="13" fill="#8f4408" text-anchor="end" font-weight="400">임계 0.5s</text>
+  <text x="30" y="236" font-family="ui-monospace,monospace" font-size="13" fill="#585f6b" text-anchor="start" font-weight="400">P95 지연</text>
+  <text x="314" y="78" font-family="ui-monospace,monospace" font-size="13" fill="#1a4fa0" text-anchor="middle" font-weight="600">여기</text>
+  <text x="516" y="30" font-family="ui-monospace,monospace" font-size="16" fill="#585f6b" text-anchor="start" font-weight="400">로그 — 왜</text>
+  <rect x="516" y="46" width="420" height="200" rx="0" fill="#f5f6f7" stroke="#d8dbe0" stroke-width="1.5"/>
+  <text x="532" y="82" font-family="ui-monospace,monospace" font-size="14" fill="#585f6b" text-anchor="start" font-weight="400">14:22:31  order-api</text>
+  <text x="532" y="108" font-family="ui-monospace,monospace" font-size="14" fill="#8f4408" text-anchor="start" font-weight="400">ERROR  timeout waiting for</text>
+  <text x="532" y="130" font-family="ui-monospace,monospace" font-size="14" fill="#8f4408" text-anchor="start" font-weight="400">       payment-gw (3000ms)</text>
+  <text x="532" y="168" font-family="ui-monospace,monospace" font-size="14" fill="#585f6b" text-anchor="start" font-weight="400">14:22:31  order-api</text>
+  <text x="532" y="190" font-family="ui-monospace,monospace" font-size="14" fill="#585f6b" text-anchor="start" font-weight="400">WARN   retry 1/3</text>
+  <text x="532" y="226" font-family="ui-monospace,monospace" font-size="13" fill="#1a4fa0" text-anchor="start" font-weight="400">같은 시각의 그 한 줄</text>
+  <line x1="452" y1="146" x2="508" y2="146" stroke="#1a4fa0" stroke-width="1.8" marker-end="url(#gap-00-02-a0002)"/>
+  <text x="480" y="136" font-family="ui-monospace,monospace" font-size="13" fill="#1a4fa0" text-anchor="middle" font-weight="600">왜?</text>
+</svg></div></div><div class="key">메트릭은 '지금 이상하다'까지만 안다. 왜 이상한지는 그 시각의 로그에 있다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">00 · 환경과 버전 고정</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">00 · 환경과 버전 고정</div><h2>폐쇄형과 개방형</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 268" role="img" aria-label="앱 바깥에서 보는 지표와 앱 안에서 내보내는 지표의 대비">
+  <rect width="960" height="268" fill="#ffffff"/>
+  <defs><marker id="gap-00-03-a0003" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#585f6b"/></marker></defs>
+  <text x="24" y="30" font-family="ui-monospace,monospace" font-size="16" fill="#585f6b" text-anchor="start" font-weight="400">폐쇄형 — 바깥에서 본다</text>
+  <rect x="24" y="46" width="420" height="210" rx="0" fill="none" stroke="#d8dbe0" stroke-width="1.5"/>
+  <rect x="150" y="96" width="168" height="74" rx="0" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="234" y="130" font-family="ui-monospace,monospace" font-size="15" fill="#15181d" text-anchor="middle" font-weight="400">애플리케이션</text>
+  <text x="234" y="152" font-family="ui-monospace,monospace" font-size="13" fill="#585f6b" text-anchor="middle" font-weight="400">(안이 안 보인다)</text>
+  <line x1="60" y1="133" x2="142" y2="133" stroke="#585f6b" stroke-width="1.8" marker-end="url(#gap-00-03-a0003)"/>
+  <text x="34" y="126" font-family="ui-monospace,monospace" font-size="14" fill="#585f6b" text-anchor="start" font-weight="400">CPU</text>
+  <text x="34" y="148" font-family="ui-monospace,monospace" font-size="14" fill="#585f6b" text-anchor="start" font-weight="400">메모리</text>
+  <text x="234" y="208" font-family="sans-serif" font-size="14" fill="#585f6b" text-anchor="middle" font-weight="400">'느리다'는 알지만</text>
+  <text x="234" y="230" font-family="sans-serif" font-size="14" fill="#585f6b" text-anchor="middle" font-weight="400">왜 느린지는 모른다</text>
+  <text x="516" y="30" font-family="ui-monospace,monospace" font-size="16" fill="#585f6b" text-anchor="start" font-weight="400">개방형 — 안에서 내보낸다</text>
+  <rect x="516" y="46" width="420" height="210" rx="0" fill="none" stroke="#1a4fa0" stroke-width="1.5"/>
+  <rect x="566" y="96" width="168" height="74" rx="0" fill="#f5f6f7" stroke="#1a4fa0" stroke-width="1.5"/>
+  <text x="650" y="124" font-family="ui-monospace,monospace" font-size="15" fill="#15181d" text-anchor="middle" font-weight="400">애플리케이션</text>
+  <text x="650" y="148" font-family="ui-monospace,monospace" font-size="13" fill="#1a4fa0" text-anchor="middle" font-weight="400">계측 코드</text>
+  <line x1="742" y1="133" x2="906" y2="133" stroke="#1a4fa0" stroke-width="1.8" marker-end="url(#gap-00-03-a0003)"/>
+  <text x="760" y="118" font-family="ui-monospace,monospace" font-size="13" fill="#1a4fa0" text-anchor="start" font-weight="400">orders_created</text>
+  <text x="760" y="158" font-family="ui-monospace,monospace" font-size="13" fill="#1a4fa0" text-anchor="start" font-weight="400">processing_seconds</text>
+  <text x="726" y="208" font-family="sans-serif" font-size="14" fill="#15181d" text-anchor="middle" font-weight="400">'주문 처리가 3초'</text>
+  <text x="726" y="230" font-family="sans-serif" font-size="14" fill="#1a4fa0" text-anchor="middle" font-weight="400">— 맥락이 있다</text>
+</svg></div></div><div class="key">CPU·메모리는 앱이 왜 그렇게 동작하는지 맥락을 주지 못한다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">00 · 환경과 버전 고정</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">00 · 환경과 버전 고정</div><h2>메트릭은 당겨 오고 로그는 밀어 보낸다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 500" role="img" aria-label="네임스페이스별 구성요소와 메트릭 pull, 로그 push 데이터 흐름">
+      <rect width="960" height="500" fill="#ffffff"/>
+
+      <!-- 클러스터 경계 -->
+      <rect x="16" y="40" width="704" height="444" fill="none" stroke="#9aa1ad" stroke-width="1.5" stroke-dasharray="6 4"/>
+      <text x="32" y="30" font-family="ui-monospace,monospace" font-size="12.5" fill="#585f6b">kind 클러스터</text>
+
+      <!-- apps ns -->
+      <rect x="40" y="64" width="290" height="176" fill="none" stroke="#15181d" stroke-width="1.5"/>
+      <text x="56" y="88" font-family="ui-monospace,monospace" font-size="12.5" fill="#585f6b">namespace: apps</text>
+      <rect x="56" y="102" width="258" height="46" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="70" y="122" font-size="13.5" fill="#15181d">gateway</text>
+      <text x="70" y="139" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">Spring Cloud Gateway · :8080</text>
+      <rect x="56" y="158" width="258" height="46" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="70" y="178" font-size="13.5" fill="#15181d">order-api</text>
+      <text x="70" y="195" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">Spring Boot 4.1 · /actuator/*</text>
+      <text x="56" y="226" font-size="12" fill="#585f6b">표준 출력(stdout)으로 로그 기록</text>
+
+      <!-- logging ns -->
+      <rect x="40" y="272" width="290" height="200" fill="none" stroke="#15181d" stroke-width="1.5"/>
+      <text x="56" y="296" font-family="ui-monospace,monospace" font-size="12.5" fill="#585f6b">namespace: logging</text>
+      <rect x="56" y="310" width="258" height="46" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="70" y="330" font-size="13.5" fill="#15181d">Grafana Alloy</text>
+      <text x="70" y="347" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">DaemonSet · 노드마다 1개</text>
+      <rect x="56" y="390" width="258" height="46" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="70" y="410" font-size="13.5" fill="#15181d">Loki</text>
+      <text x="70" y="427" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">로그 저장 · LogQL 질의 응답</text>
+      <text x="56" y="458" font-size="12" fill="#585f6b">Promtail은 2026-03 EOL, 사용하지 않음</text>
+
+      <!-- monitoring ns -->
+      <rect x="382" y="64" width="308" height="392" fill="none" stroke="#15181d" stroke-width="1.5"/>
+      <text x="398" y="88" font-family="ui-monospace,monospace" font-size="12.5" fill="#585f6b">namespace: monitoring</text>
+      <rect x="416" y="102" width="258" height="44" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="430" y="130" font-size="13.5" fill="#15181d">Prometheus</text>
+      <rect x="416" y="158" width="258" height="44" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="430" y="186" font-size="13.5" fill="#15181d">Alertmanager</text>
+      <rect x="416" y="214" width="258" height="44" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="430" y="242" font-size="13.5" fill="#15181d">Grafana</text>
+      <rect x="416" y="270" width="258" height="44" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="430" y="298" font-size="13.5" fill="#15181d">kube-state-metrics</text>
+      <rect x="416" y="326" width="258" height="44" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="430" y="347" font-size="13.5" fill="#15181d">node-exporter</text>
+      <text x="430" y="363" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">DaemonSet</text>
+      <text x="398" y="400" font-size="12" fill="#585f6b">kube-prometheus-stack 차트 하나로</text>
+      <text x="398" y="418" font-size="12" fill="#585f6b">위 5개가 한 번에 설치된다</text>
+
+      <!-- pull: prometheus → apps -->
+      <path d="M414 124 L336 124" fill="none" stroke="#6a4a9c" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#ch00-fig2-ar-p2)"/>
+      <text x="375" y="114" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11.5" fill="#6a4a9c">pull · 30s</text>
+
+      <!-- grafana → prometheus (내부 질의) -->
+      <path d="M396 214 L396 150" fill="none" stroke="#1f4d8f" stroke-width="1.5" marker-end="url(#ch00-fig2-ar-b)"/>
+      <text x="390" y="190" text-anchor="end" font-family="ui-monospace,monospace" font-size="11" fill="#1f4d8f">PromQL</text>
+
+      <!-- grafana → loki -->
+      <path d="M414 236 L346 236 L346 413 L318 413" fill="none" stroke="#1f4d8f" stroke-width="1.5" marker-end="url(#ch00-fig2-ar-b)"/>
+      <text x="352" y="322" font-family="ui-monospace,monospace" font-size="11" fill="#1f4d8f">LogQL</text>
+
+      <!-- alloy → apps 로그 수집 -->
+      <path d="M185 308 L185 248" fill="none" stroke="#b4621a" stroke-width="1.5" marker-end="url(#ch00-fig2-ar-o)"/>
+      <text x="196" y="262" font-family="ui-monospace,monospace" font-size="11" fill="#b4621a">tail /var/log/pods</text>
+
+      <!-- alloy → loki push -->
+      <path d="M185 358 L185 386" fill="none" stroke="#b4621a" stroke-width="1.5" marker-end="url(#ch00-fig2-ar-o)"/>
+      <text x="196" y="378" font-family="ui-monospace,monospace" font-size="11" fill="#b4621a">push</text>
+
+      <!-- 브라우저 -->
+      <rect x="772" y="214" width="164" height="60" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="854" y="240" text-anchor="middle" font-size="13.5" fill="#15181d">브라우저</text>
+      <text x="854" y="258" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">localhost:3000</text>
+      <path d="M770 244 L678 244" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch00-fig2-ar-g)"/>
+      <text x="704" y="234" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">port-forward</text>
+
+      <defs>
+        <marker id="ch00-fig2-ar-p2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#6a4a9c"/>
+        </marker>
+        <marker id="ch00-fig2-ar-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#1f4d8f"/>
+        </marker>
+        <marker id="ch00-fig2-ar-o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#b4621a"/>
+        </marker>
+        <marker id="ch00-fig2-ar-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#585f6b"/>
+        </marker>
+      </defs>
+    </svg><div class="fig-cap">보라 점선 = 메트릭 수집(pull) · 주황 실선 = 로그 전송(push) · 파랑 = 질의</div></div></div><div class="key">프로메테우스는 대상의 /metrics 를 긁어 온다. 로그는 수집기가 로키로 밀어 넣는다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">00 · 환경과 버전 고정</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">00 · 환경과 버전 고정</div><h2>버전 매트릭스</h2><div class="body"><table class="dense">
+<thead><tr><th>구성요소</th><th>고정 버전</th><th>확인된 변경점</th></tr></thead>
+<tbody>
+<tr><td>Kubernetes</td><td>1.36.x</td><td>유지 브랜치는 최근 3개(1.36 / 1.35 / 1.34)</td></tr>
+<tr><td>kind</td><td>v0.32.0</td><td>기본 노드 이미지 kindest/node:v1.36.1</td></tr>
+<tr><td>kube-prometheus-stack</td><td>차트 86.x–88.x</td><td>Prometheus Operator v0.91.0 계열</td></tr>
+<tr><td>Grafana</td><td>13.x</td><td>2026-04-21 GA. Dynamic dashboards 정식</td></tr>
+<tr><td>Loki</td><td>3.7.x (차트 17.x)</td><td>차트가 2026-03-16부로 grafana-community 로 이전</td></tr>
+<tr><td>로그 수집기</td><td>Grafana Alloy</td><td>Promtail 은 2026-03-02 EOL</td></tr>
+<tr><td>Spring Boot</td><td>4.1.0</td><td>2026-06-10 릴리스</td></tr>
+</tbody>
+</table></div><div class="key">검증일과 함께 적는다. 실습 당일 재확인</div></div>
+<div class="slide-footer"><span class="slide-footer-left">00 · 환경과 버전 고정</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">00 · 환경과 버전 고정</div><h2>사전 점검</h2><div class="body"><pre>=== 도구 버전 ===
+docker     28.1.1              (권장 24.0+)
+kubectl    v1.36.1             (권장 v1.36.x)
+kind       v0.32.0             (권장 v0.32.0)
+helm       v3.16.4+g7877b45    (권장 v3.16+)
+java       21.0.7              (권장 21)
+
+=== 도커 자원 ===
+CPU 6코어 / MEM 10.0 GiB
+
+<span class="verdict">결과: 통과 — 01장으로 진행하세요        ← 판정 줄</span></pre></div><div class="key">여기서 막히면 다음 장이 전부 막힌다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">00 · 환경과 버전 고정</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide sec">
+<div class="slide-inner sec"><div class="cnum">01</div><h1>kind 클러스터 구축</h1><div class="sub"><span>01-01</span>설정 파일 20줄이 승부처<br><span>01-02</span>만든 뒤에는 못 고친다<br><span>01-03</span>맥에서 포트가 흐르는 경로<br><span>01-04</span>클러스터 생성과 검증<br></div></div>
+<div class="slide-footer"><span class="slide-footer-left">SECTION 01</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">01 · kind 클러스터 구축</div><h2>설정 파일 20줄이 승부처</h2><div class="body"><pre><span class="dim"># kind-cluster.yaml — 이 부분이 04장의 타깃 4개를 살린다</span>
+kubeadmConfigPatches:
+  - |
+    apiVersion: kubeadm.k8s.io/v1beta4<span class="dim">     # v1beta3 예제는 형식이 다르다</span>
+    controllerManager:
+      extraArgs:
+        - { name: bind-address, value: "0.0.0.0" }
+    ...<span class="dim">    # scheduler · etcd · kube-proxy 도 같은 방식</span></pre></div><div class="key">기본 설정으로 만들면 04장에서 controller-manager·scheduler·etcd·kube-proxy 가 DOWN 이다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">01 · kind 클러스터 구축</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">01 · kind 클러스터 구축</div><h2>만든 뒤에는 못 고친다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 268" role="img" aria-label="지금 설정 파일 20줄과 나중에 노드에 진입해 고치는 경로의 대비">
+  <rect width="960" height="268" fill="#ffffff"/>
+  <defs><marker id="gap-01-02-a0102" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#585f6b"/></marker></defs>
+  <line x1="60" y1="150" x2="900" y2="150" stroke="#585f6b" stroke-width="1.5"/>
+  <line x1="150" y1="140" x2="150" y2="160" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="150" y="178" font-family="ui-monospace,monospace" font-size="14" fill="#585f6b" text-anchor="middle" font-weight="400">클러스터 생성 전</text>
+  <line x1="560" y1="140" x2="560" y2="160" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="560" y="178" font-family="ui-monospace,monospace" font-size="14" fill="#585f6b" text-anchor="middle" font-weight="400">생성 후</text>
+  <rect x="60" y="56" width="320" height="70" rx="0" fill="#f5f6f7" stroke="#1a4fa0" stroke-width="1.5"/>
+  <text x="76" y="84" font-family="ui-monospace,monospace" font-size="16" fill="#1a4fa0" text-anchor="start" font-weight="600">설정 파일에 20줄</text>
+  <text x="76" y="108" font-family="ui-monospace,monospace" font-size="14" fill="#585f6b" text-anchor="start" font-weight="400">kind create 한 번</text>
+  <line x1="150" y1="132" x2="150" y2="144" stroke="#1a4fa0" stroke-width="1.8" marker-end="url(#gap-01-02-a0102)"/>
+  <text x="392" y="96" font-family="ui-monospace,monospace" font-size="15" fill="#1a4fa0" text-anchor="start" font-weight="600">5분</text>
+  <rect x="470" y="180" width="430" height="92" rx="0" fill="none" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="486" y="208" font-family="ui-monospace,monospace" font-size="16" fill="#15181d" text-anchor="start" font-weight="600">컨트롤 플레인 노드 진입</text>
+  <text x="486" y="232" font-family="ui-monospace,monospace" font-size="14" fill="#585f6b" text-anchor="start" font-weight="400">매니페스트 수정 → 정적 파드 재시작</text>
+  <text x="486" y="256" font-family="ui-monospace,monospace" font-size="14" fill="#8f4408" text-anchor="start" font-weight="400">노드마다 반복 · 재현 안 됨</text>
+  <line x1="560" y1="158" x2="560" y2="174" stroke="#585f6b" stroke-width="1.8" marker-end="url(#gap-01-02-a0102)"/>
+  <text x="24" y="40" font-family="ui-monospace,monospace" font-size="16" fill="#585f6b" text-anchor="start" font-weight="400">같은 결과, 다른 비용</text>
+</svg></div></div><div class="key">클러스터를 만든 뒤 바꾸려면 컨트롤 플레인 노드에 들어가 매니페스트를 고치고 재시작해야 한다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">01 · kind 클러스터 구축</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">01 · kind 클러스터 구축</div><h2>맥에서 포트가 흐르는 경로</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 340" role="img" aria-label="macOS에서 브라우저가 NodePort로 그라파나에 도달하는 경로">
+      <rect width="960" height="340" fill="#ffffff"/>
+
+      <!-- 브라우저 -->
+      <rect x="24" y="128" width="150" height="64" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="99" y="154" text-anchor="middle" font-size="13.5" fill="#15181d">브라우저</text>
+      <text x="99" y="174" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">127.0.0.1:30300</text>
+
+      <path d="M176 160 L226 160" fill="none" stroke="#6a4a9c" stroke-width="1.5" marker-end="url(#ch01-fig1-a1)"/>
+
+      <!-- Docker VM -->
+      <rect x="228" y="52" width="708" height="240" fill="none" stroke="#9aa1ad" stroke-width="1.5" stroke-dasharray="6 4"/>
+      <text x="244" y="42" font-family="ui-monospace,monospace" font-size="12" fill="#585f6b">Docker Desktop VM (Apple Virtualization)</text>
+
+      <!-- control-plane 컨테이너 -->
+      <rect x="252" y="88" width="238" height="168" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="268" y="112" font-family="ui-monospace,monospace" font-size="12.5" fill="#1f4d8f">obs-control-plane</text>
+      <line x1="252" y1="124" x2="490" y2="124" stroke="#d8dbe0" stroke-width="1"/>
+      <text x="268" y="148" font-family="ui-monospace,monospace" font-size="12" fill="#15181d">:30300 (extraPortMapping)</text>
+      <rect x="268" y="166" width="204" height="42" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="370" y="192" text-anchor="middle" font-size="12.5" fill="#15181d">kube-proxy</text>
+      <text x="268" y="232" font-size="11.5" fill="#585f6b">NodePort 규칙으로 목적지 재작성</text>
+
+      <path d="M492 187 L560 187" fill="none" stroke="#6a4a9c" stroke-width="1.5" marker-end="url(#ch01-fig1-a1)"/>
+      <text x="526" y="177" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#6a4a9c">파드 IP</text>
+
+      <!-- worker2 컨테이너 -->
+      <rect x="562" y="88" width="238" height="168" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="578" y="112" font-family="ui-monospace,monospace" font-size="12.5" fill="#1f4d8f">obs-worker2</text>
+      <line x1="562" y1="124" x2="800" y2="124" stroke="#d8dbe0" stroke-width="1"/>
+      <rect x="578" y="152" width="204" height="56" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="680" y="176" text-anchor="middle" font-size="13" fill="#15181d">Grafana 파드</text>
+      <text x="680" y="195" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">containerPort 3000</text>
+      <text x="578" y="232" font-size="11.5" fill="#585f6b">파드는 어느 노드에 있어도 된다</text>
+
+      <!-- 하단 설명 -->
+      <text x="252" y="284" font-size="12" fill="#585f6b">호스트 30300 → 컨테이너 30300 → NodePort 서비스 → 파드 3000</text>
+
+      <defs>
+        <marker id="ch01-fig1-a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#6a4a9c"/>
+        </marker>
+      </defs>
+    </svg><div class="fig-cap">포트 매핑은 컨트롤 플레인 노드에만 걸어도 된다 — NodePort 는 모든 노드에서 열린다</div></div></div><div class="key">네 칸을 전부 뚫어야 브라우저에서 그라파나가 열린다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">01 · kind 클러스터 구축</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">01 · kind 클러스터 구축</div><h2>클러스터 생성과 검증</h2><div class="body"><pre>NAME                STATUS   ROLES           AGE   VERSION
+obs-control-plane   Ready    control-plane   96s   v1.36.1
+obs-worker          Ready    &lt;none&gt;          82s   v1.36.1
+obs-worker2         Ready    &lt;none&gt;          82s   v1.36.1</pre><div class="verdict-note"><b>판정</b> — STATUS 가 셋 다 Ready.  AGE 는 환경마다 다르다.</div></div><div class="key">STATUS 가 전부 Ready</div></div>
+<div class="slide-footer"><span class="slide-footer-left">01 · kind 클러스터 구축</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide sec">
+<div class="slide-inner sec"><div class="cnum">02</div><h1>계측 가능한 애플리케이션</h1><div class="sub"><span>02-01</span>파드는 오래 살지 않는다<br><span>02-02</span>USE 와 RED<br><span>02-03</span>평균 40ms 뒤에 숨은 3초<br><span>02-04</span>분위수는 공짜가 아니다<br><span>02-05</span>요청 하나가 만드는 세 종류<br><span>02-06</span>이 네 이름을 바꾸지 않는다<br></div></div>
+<div class="slide-footer"><span class="slide-footer-left">SECTION 02</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">02 · 계측 가능한 애플리케이션</div><h2>파드는 오래 살지 않는다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 236" role="img" aria-label="VM 수명과 파드 수명의 대비, 그리고 라벨로 묶은 집합">
+  <rect width="960" height="236" fill="#ffffff"/>
+  <text x="24" y="34" font-family="ui-monospace,monospace" font-size="16" fill="#585f6b" text-anchor="start" font-weight="400">VM — 개별 인스턴스를 추적한다</text>
+  <rect x="300" y="50" width="600" height="34" rx="0" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="312" y="72" font-family="ui-monospace,monospace" font-size="14" fill="#15181d" text-anchor="start" font-weight="400">web-01                                    24시간+</text>
+  <text x="24" y="72" font-family="ui-monospace,monospace" font-size="14" fill="#585f6b" text-anchor="start" font-weight="400">이름이 곧 대상</text>
+  <text x="24" y="132" font-family="ui-monospace,monospace" font-size="16" fill="#585f6b" text-anchor="start" font-weight="400">파드 — 이름이 계속 바뀐다</text>
+  <rect x="300" y="148" width="96" height="26" rx="0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.2"/>
+  <text x="306" y="166" font-family="ui-monospace,monospace" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">…-a0x0</text>
+  <rect x="404" y="148" width="62" height="26" rx="0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.2"/>
+  <text x="410" y="166" font-family="ui-monospace,monospace" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">…-b1x1</text>
+  <rect x="472" y="148" width="120" height="26" rx="0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.2"/>
+  <text x="478" y="166" font-family="ui-monospace,monospace" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">…-c2x2</text>
+  <rect x="598" y="148" width="78" height="26" rx="0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.2"/>
+  <text x="604" y="166" font-family="ui-monospace,monospace" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">…-d3x3</text>
+  <rect x="682" y="148" width="140" height="26" rx="0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.2"/>
+  <text x="688" y="166" font-family="ui-monospace,monospace" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">…-e4x4</text>
+  <rect x="828" y="148" width="72" height="26" rx="0" fill="#ffffff" stroke="#9aa1ad" stroke-width="1.2"/>
+  <text x="834" y="166" font-family="ui-monospace,monospace" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">…-f5x5</text>
+  <line x1="300" y1="196" x2="900" y2="196" stroke="#585f6b" stroke-width="1.2" stroke-dasharray="4 4"/>
+  <text x="300" y="216" font-family="ui-monospace,monospace" font-size="14" fill="#1a4fa0" text-anchor="start" font-weight="400">job="order-api" 로 묶으면 하나의 시계열</text>
+  <text x="24" y="166" font-family="ui-monospace,monospace" font-size="14" fill="#585f6b" text-anchor="start" font-weight="400">수 분~수 시간</text>
+</svg></div></div><div class="key">개별 인스턴스를 추적하는 방식은 성립하지 않는다. 레이블로 묶은 집합을 본다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">02 · 계측 가능한 애플리케이션</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">02 · 계측 가능한 애플리케이션</div><h2>USE 와 RED</h2><div class="body"><table>
+<thead><tr><th>방법론</th><th>세 지표</th><th>보는 대상</th></tr></thead>
+<tbody>
+<tr><td>USE</td><td>사용률 · 포화도 · 에러</td><td>인프라</td></tr>
+<tr><td>RED</td><td>처리율 · 에러 수 · 처리 시간</td><td>애플리케이션</td></tr>
+</tbody>
+</table></div><div class="key">USE 는 사용률·포화도·에러, RED 는 처리율·에러·처리시간</div></div>
+<div class="slide-footer"><span class="slide-footer-left">02 · 계측 가능한 애플리케이션</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">02 · 계측 가능한 애플리케이션</div><h2>평균 40ms 뒤에 숨은 3초</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 276" role="img" aria-label="지연 분포 히스토그램에 평균선과 P99 선을 겹친 그림">
+  <rect width="960" height="276" fill="#ffffff"/>
+  <line x1="90" y1="60" x2="90" y2="240" stroke="#585f6b" stroke-width="1.2"/>
+  <line x1="90" y1="240" x2="880" y2="240" stroke="#585f6b" stroke-width="1.2"/>
+  <rect x="106" y="90" width="30" height="150" rx="0" fill="#9aa1ad" stroke="none" stroke-width="0"/>
+  <rect x="148" y="72" width="30" height="168" rx="0" fill="#9aa1ad" stroke="none" stroke-width="0"/>
+  <rect x="190" y="120" width="30" height="120" rx="0" fill="#9aa1ad" stroke="none" stroke-width="0"/>
+  <rect x="232" y="178" width="30" height="62" rx="0" fill="#9aa1ad" stroke="none" stroke-width="0"/>
+  <rect x="274" y="210" width="30" height="30" rx="0" fill="#9aa1ad" stroke="none" stroke-width="0"/>
+  <rect x="316" y="224" width="30" height="16" rx="0" fill="#9aa1ad" stroke="none" stroke-width="0"/>
+  <rect x="358" y="231" width="30" height="9" rx="0" fill="#9aa1ad" stroke="none" stroke-width="0"/>
+  <rect x="400" y="235" width="30" height="5" rx="0" fill="#9aa1ad" stroke="none" stroke-width="0"/>
+  <rect x="790" y="228" width="30" height="12" rx="0" fill="#8f4408" stroke="none" stroke-width="0"/>
+  <text x="805" y="212" font-family="ui-monospace,monospace" font-size="13" fill="#8f4408" text-anchor="middle" font-weight="600">1건</text>
+  <text x="805" y="262" font-family="ui-monospace,monospace" font-size="13" fill="#8f4408" text-anchor="middle" font-weight="400">3초</text>
+  <text x="120" y="262" font-family="ui-monospace,monospace" font-size="13" fill="#585f6b" text-anchor="start" font-weight="400">10ms</text>
+  <text x="96" y="52" font-family="ui-monospace,monospace" font-size="13" fill="#585f6b" text-anchor="start" font-weight="400">요청 수</text>
+  <line x1="152" y1="60" x2="152" y2="240" stroke="#1a4fa0" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <text x="158" y="76" font-family="ui-monospace,monospace" font-size="14" fill="#1a4fa0" text-anchor="start" font-weight="400">평균 40ms — 대시보드는 초록</text>
+  <line x1="796" y1="60" x2="796" y2="240" stroke="#8f4408" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <text x="790" y="76" font-family="ui-monospace,monospace" font-size="14" fill="#8f4408" text-anchor="end" font-weight="400">P99</text>
+</svg></div></div><div class="key">99건이 10ms, 1건이 3초면 평균은 40ms 다. 대시보드는 초록이고 그 1건은 이탈한다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">02 · 계측 가능한 애플리케이션</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">02 · 계측 가능한 애플리케이션</div><h2>분위수는 공짜가 아니다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 366" role="img" aria-label="HTTP 요청 하나가 count, sum, bucket 세 종류의 시계열로 노출되는 구조">
+      <rect width="960" height="366" fill="#ffffff"/>
+
+      <rect x="24" y="30" width="250" height="66" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="40" y="56" font-family="ui-monospace,monospace" font-size="12" fill="#15181d">GET /api/orders/{id}</text>
+      <text x="40" y="78" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">200 OK · 143ms</text>
+
+      <path d="M276 63 L336 63" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch02-fig2-n1)"/>
+
+      <rect x="338" y="30" width="250" height="66" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="354" y="56" font-size="13" fill="#15181d">Timer 갱신</text>
+      <text x="354" y="78" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">http.server.requests</text>
+
+      <path d="M463 98 L463 124" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch02-fig2-n1)"/>
+      <text x="475" y="118" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">프로메테우스 포맷으로 변환</text>
+
+      <!-- 세 갈래 -->
+      <rect x="24" y="140" width="292" height="106" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="40" y="164" font-family="ui-monospace,monospace" font-size="12" fill="#1f4d8f">_count</text>
+      <text x="40" y="188" font-size="12.5" fill="#15181d">요청 건수 누적</text>
+      <text x="40" y="212" font-family="ui-monospace,monospace" font-size="10.5" fill="#585f6b">rate()로 초당 처리율(R) 계산</text>
+      <text x="40" y="232" font-family="ui-monospace,monospace" font-size="10.5" fill="#585f6b">status 태그로 에러율(E) 계산</text>
+
+      <rect x="334" y="140" width="292" height="106" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="350" y="164" font-family="ui-monospace,monospace" font-size="12" fill="#1f4d8f">_sum</text>
+      <text x="350" y="188" font-size="12.5" fill="#15181d">소요 시간 총합(초)</text>
+      <text x="350" y="212" font-family="ui-monospace,monospace" font-size="10.5" fill="#585f6b">_sum / _count = 평균 응답 시간</text>
+      <text x="350" y="232" font-family="ui-monospace,monospace" font-size="10.5" fill="#585f6b">평균은 이상치를 숨긴다</text>
+
+      <rect x="644" y="140" width="292" height="106" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="660" y="164" font-family="ui-monospace,monospace" font-size="12" fill="#1f4d8f">_bucket{le="..."}</text>
+      <text x="660" y="188" font-size="12.5" fill="#15181d">구간별 누적 건수</text>
+      <text x="660" y="212" font-family="ui-monospace,monospace" font-size="10.5" fill="#585f6b">histogram_quantile()로 P95·P99</text>
+      <text x="660" y="232" font-family="ui-monospace,monospace" font-size="10.5" fill="#8f4408">설정을 켜야만 생성된다</text>
+
+      <line x1="24" y1="272" x2="936" y2="272" stroke="#d8dbe0" stroke-width="1"/>
+
+      <text x="24" y="300" font-size="13" fill="#15181d">세 종류 모두 같은 태그를 공유한다</text>
+      <text x="24" y="326" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">uri="/api/orders/{id}"  method="GET"  status="200"  outcome="SUCCESS"  exception="none"</text>
+      <text x="24" y="350" font-size="12" fill="#8f4408">uri 태그가 실제 ID 값으로 찍히면 시계열이 무한히 늘어난다 — 09장 카디널리티 주제의 출발점</text>
+
+      <defs>
+        <marker id="ch02-fig2-n1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#585f6b"/>
+        </marker>
+      </defs>
+    </svg><div class="fig-cap">_bucket 은 기본으로 생기지 않는다. 켜는 순간 시계열이 버킷 개수만큼 는다</div></div></div><div class="key">켜는 순간 시계열이 버킷 개수만큼 는다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">02 · 계측 가능한 애플리케이션</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">02 · 계측 가능한 애플리케이션</div><h2>요청 하나가 만드는 세 종류</h2><div class="body"><table class="dense">
+<thead><tr><th>메트릭</th><th>타입</th><th>쓰이는 곳</th></tr></thead>
+<tbody>
+<tr><td>http_server_requests_seconds_count</td><td>카운터</td><td>06 — 처리율 R, 에러율 E</td></tr>
+<tr><td>http_server_requests_seconds_bucket</td><td>히스토그램</td><td>06 · 07 — P95 · P99 지연 D</td></tr>
+<tr><td>orders_created_total</td><td>카운터</td><td>07 — 비즈니스 지표 패널</td></tr>
+<tr><td>orders_rejected_total</td><td>카운터</td><td>07 — 거부율 알림 규칙</td></tr>
+<tr><td>orders_processing_seconds_*</td><td>타이머</td><td>06 — HTTP 지연과 내부 처리 지연 분리</td></tr>
+<tr><td>orders_stored</td><td>게이지</td><td>07 — 게이지와 카운터의 그래프 차이</td></tr>
+</tbody>
+</table></div><div class="key">세 번째가 이 실습의 핵심이다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">02 · 계측 가능한 애플리케이션</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">02 · 계측 가능한 애플리케이션</div><h2>이 네 이름을 바꾸지 않는다</h2><div class="body"><pre><span class="dim"># 코드에 쓰는 이름          →  /actuator/prometheus 에 나오는 이름</span>
+orders.created            →  orders_created_total
+orders.rejected           →  orders_rejected_total
+orders.processing         →  orders_processing_seconds_{count,sum,bucket}
+orders.stored             →  orders_stored
+
+<span class="dim"># 마이크로미터가 . 을 _ 로 바꾸고 카운터에 _total 을 붙인다.</span>
+<span class="dim"># 06장 PromQL 과 07장 대시보드 JSON 이 오른쪽 이름에 의존한다.</span></pre></div><div class="key">마이크로미터가 점을 밑줄로 바꿔 orders_created_total 로 노출한다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">02 · 계측 가능한 애플리케이션</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">02 · 계측 가능한 애플리케이션</div><h2>두 서비스를 <span class="hi">같은 방식</span>으로 계측한다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 320" role="img" aria-label="게이트웨이와 주문 API의 호출 관계 및 메트릭 노출 지점">
+      <rect width="960" height="320" fill="#ffffff"/>
+
+      <rect x="24" y="110" width="130" height="60" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="89" y="136" text-anchor="middle" font-size="13" fill="#15181d">클라이언트</text>
+      <text x="89" y="155" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">curl · k6</text>
+
+      <path d="M156 140 L214 140" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch02-fig1-m1)"/>
+
+      <!-- gateway -->
+      <rect x="216" y="72" width="240" height="136" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="234" y="98" font-size="14" fill="#15181d">gateway</text>
+      <text x="234" y="117" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">:8080 · WebFlux</text>
+      <line x1="216" y1="130" x2="456" y2="130" stroke="#d8dbe0" stroke-width="1"/>
+      <text x="234" y="152" font-family="ui-monospace,monospace" font-size="11.5" fill="#15181d">http.server.requests</text>
+      <text x="234" y="171" font-family="ui-monospace,monospace" font-size="11" fill="#15181d">spring.cloud.gateway.requests</text>
+      <text x="234" y="194" font-family="ui-monospace,monospace" font-size="11" fill="#1a4fa0">/actuator/prometheus</text>
+
+      <path d="M458 140 L516 140" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch02-fig1-m1)"/>
+      <text x="487" y="130" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10.5" fill="#585f6b">HTTP</text>
+
+      <!-- order-api -->
+      <rect x="518" y="72" width="240" height="136" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="536" y="98" font-size="14" fill="#15181d">order-api</text>
+      <text x="536" y="117" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">:8080 · MVC</text>
+      <line x1="518" y1="130" x2="758" y2="130" stroke="#d8dbe0" stroke-width="1"/>
+      <text x="536" y="152" font-family="ui-monospace,monospace" font-size="11.5" fill="#15181d">http.server.requests</text>
+      <text x="536" y="171" font-family="ui-monospace,monospace" font-size="11" fill="#15181d">orders.created · orders.processing</text>
+      <text x="536" y="194" font-family="ui-monospace,monospace" font-size="11" fill="#1a4fa0">/actuator/prometheus</text>
+
+      <!-- prometheus -->
+      <rect x="790" y="100" width="146" height="80" fill="#ffffff" stroke="#6a4a9c" stroke-width="1.5"/>
+      <text x="863" y="128" text-anchor="middle" font-size="13" fill="#15181d">Prometheus</text>
+      <text x="863" y="148" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10.5" fill="#6a4a9c">04장에서 연결</text>
+
+      <path d="M863 182 L863 244 L336 244" fill="none" stroke="#6a4a9c" stroke-width="1.5" stroke-dasharray="5 3"/>
+      <path d="M638 244 L638 212" fill="none" stroke="#6a4a9c" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#ch02-fig1-m2)"/>
+      <path d="M336 244 L336 212" fill="none" stroke="#6a4a9c" stroke-width="1.5" marker-end="url(#ch02-fig1-m2)"/>
+      <text x="700" y="266" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#6a4a9c">두 서비스를 각각 스크레이프</text>
+
+      <text x="24" y="300" font-size="12" fill="#585f6b">애플리케이션은 메트릭을 어디로도 보내지 않는다. 엔드포인트를 열어두고 기다릴 뿐이다.</text>
+
+      <defs>
+        <marker id="ch02-fig1-m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#585f6b"/>
+        </marker>
+        <marker id="ch02-fig1-m2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#6a4a9c"/>
+        </marker>
+      </defs>
+    </svg></div></div><div class="key">차이는 게이트웨이만 <code>spring.cloud.gateway.requests</code> 를 더 내보낸다는 점이다 - 라우트 ID 태그가 붙어 어떤 백엔드가 느린지 바로 보인다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">02 · 계측 가능한 애플리케이션</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide sec">
+<div class="slide-inner sec"><div class="cnum">03</div><h1>컨테이너화와 배포</h1><div class="sub"><span>03-01</span>docker images 에 보여도 파드는 안 뜬다<br><span>03-02</span>적재 확인은 노드 안에서<br><span>03-03</span>latest 를 쓰면 조용히 깨진다<br><span>03-04</span>프로브 세 개가 답하는 서로 다른 질문<br><span>03-05</span>이미지 크기 — Dockerfile 네 개<br><span>03-06</span>배포와 검증<br></div></div>
+<div class="slide-footer"><span class="slide-footer-left">SECTION 03</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">03 · 컨테이너화와 배포</div><h2>docker images 에 보여도 파드는 안 뜬다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" role="img" aria-label="Gradle 빌드에서 kind 노드 적재를 거쳐 파드가 뜨기까지의 경로">
+      <rect width="960" height="330" fill="#ffffff"/>
+
+      <rect x="24" y="40" width="200" height="76" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="40" y="66" font-size="13.5" fill="#15181d">1. 이미지 빌드</text>
+      <text x="40" y="88" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">./gradlew bootBuildImage</text>
+      <text x="40" y="106" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">→ 맥의 도커 이미지 목록</text>
+
+      <path d="M226 78 L286 78" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch03-fig1-p1)"/>
+
+      <rect x="288" y="40" width="200" height="76" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="304" y="66" font-size="13.5" fill="#15181d">2. 노드에 적재</text>
+      <text x="304" y="88" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">kind load docker-image</text>
+      <text x="304" y="106" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">→ 각 노드 containerd</text>
+
+      <path d="M490 78 L550 78" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch03-fig1-p1)"/>
+
+      <rect x="552" y="40" width="200" height="76" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="568" y="66" font-size="13.5" fill="#15181d">3. 매니페스트 적용</text>
+      <text x="568" y="88" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">kubectl apply -f k8s/</text>
+      <text x="568" y="106" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">→ Deployment 생성</text>
+
+      <!-- 적재 버스: 세 노드 모두에 복사된다 -->
+      <path d="M388 116 L388 134" fill="none" stroke="#585f6b" stroke-width="1.5"/>
+      <line x1="170" y1="134" x2="790" y2="134" stroke="#585f6b" stroke-width="1.5"/>
+      <path d="M170 134 L170 174" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch03-fig1-p1)"/>
+      <path d="M480 134 L480 174" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch03-fig1-p1)"/>
+      <path d="M790 134 L790 174" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch03-fig1-p1)"/>
+      <text x="520" y="128" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">세 노드 모두에 복사된다</text>
+      <text x="24" y="168" font-family="ui-monospace,monospace" font-size="12" fill="#585f6b">kind 클러스터</text>
+
+      <rect x="24" y="178" width="292" height="104" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="40" y="202" font-family="ui-monospace,monospace" font-size="12" fill="#1f4d8f">obs-control-plane</text>
+      <text x="40" y="226" font-size="12" fill="#585f6b">이미지는 적재되지만</text>
+      <text x="40" y="246" font-size="12" fill="#585f6b">앱 파드는 뜨지 않는다</text>
+      <text x="40" y="268" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">(control-plane 테인트)</text>
+
+      <rect x="334" y="178" width="292" height="104" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="350" y="202" font-family="ui-monospace,monospace" font-size="12" fill="#1f4d8f">obs-worker · workload=apps</text>
+      <rect x="350" y="216" width="122" height="34" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="411" y="238" text-anchor="middle" font-size="12" fill="#15181d">order-api ×2</text>
+      <rect x="482" y="216" width="128" height="34" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="546" y="238" text-anchor="middle" font-size="12" fill="#15181d">gateway ×1</text>
+      <text x="350" y="270" font-size="11.5" fill="#585f6b">노드셀렉터로 여기에 모은다</text>
+
+      <rect x="644" y="178" width="292" height="104" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="660" y="202" font-family="ui-monospace,monospace" font-size="12" fill="#1f4d8f">obs-worker2 · observability</text>
+      <text x="660" y="228" font-size="12" fill="#585f6b">04장에서 관측 스택이</text>
+      <text x="660" y="248" font-size="12" fill="#585f6b">들어올 자리</text>
+
+      <text x="24" y="312" font-size="12" fill="#8f4408">적재는 노드별로 이뤄진다 — 노드를 추가하면 이미지를 다시 적재해야 한다</text>
+
+      <defs>
+        <marker id="ch03-fig1-p1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#585f6b"/>
+        </marker>
+      </defs>
+    </svg><div class="fig-cap">도커 데몬의 저장소와 kind 노드 안 런타임 저장소는 다른 공간이다</div></div></div><div class="key">도커 데몬의 저장소와 kind 노드 안 런타임 저장소는 다른 공간이다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">03 · 컨테이너화와 배포</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">03 · 컨테이너화와 배포</div><h2>적재 확인은 노드 안에서</h2><div class="body"><pre>docker exec obs-worker crictl images | grep obs/
+
+docker.io/obs/gateway     0.0.1   3f2a91c4e7b8f   289MB
+docker.io/obs/order-api   0.0.1   b71c05de9a12c   276MB</pre><div class="verdict-note"><b>판정</b> — 두 줄이 보이면 적재 완료.  docker images 로는 알 수 없다. 이미지 ID 는 환경마다 다르다.</div></div><div class="key">docker images 로는 알 수 없다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">03 · 컨테이너화와 배포</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">03 · 컨테이너화와 배포</div><h2>latest 를 쓰면 조용히 깨진다</h2><div class="body"><table>
+<thead><tr><th>이미지 태그</th><th>기본 imagePullPolicy</th><th>이 실습에서 무슨 일이 나나</th></tr></thead>
+<tbody>
+<tr><td>:latest 또는 태그 생략</td><td>Always</td><td>적재해 둔 이미지를 무시하고 레지스트리로 나간다 → ErrImagePull</td></tr>
+<tr><td>:0.0.1 처럼 버전 태그</td><td>IfNotPresent</td><td>노드에 있으면 그대로 쓴다 → 정상</td></tr>
+</tbody>
+</table></div><div class="key">latest 면 Always 가 되어 적재해 둔 이미지를 무시하고 ErrImagePull</div></div>
+<div class="slide-footer"><span class="slide-footer-left">03 · 컨테이너화와 배포</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">03 · 컨테이너화와 배포</div><h2>프로브 세 개가 답하는 서로 다른 질문</h2><div class="body"><div class="cards dense">
+<div class="card"><div class="card-h">프로브 startup</div><div class="card-row"><div class="card-k">답하는 질문</div><div class="card-v">아직 시작 중인가</div></div><div class="card-row"><div class="card-k">실패하면</div><div class="card-v">다른 두 프로브를 미룬다</div></div><div class="card-row"><div class="card-k">액추에이터 경로</div><div class="card-v">/actuator/health/liveness</div></div></div>
+<div class="card"><div class="card-h">프로브 readiness</div><div class="card-row"><div class="card-k">답하는 질문</div><div class="card-v">지금 트래픽을 받아도 되나</div></div><div class="card-row"><div class="card-k">실패하면</div><div class="card-v">서비스 엔드포인트에서 빠진다. 파드는 살아 있다</div></div><div class="card-row"><div class="card-k">액추에이터 경로</div><div class="card-v">/actuator/health/readiness</div></div></div>
+<div class="card"><div class="card-h">프로브 liveness</div><div class="card-row"><div class="card-k">답하는 질문</div><div class="card-v">살아 있나</div></div><div class="card-row"><div class="card-k">실패하면</div><div class="card-v">컨테이너를 죽이고 다시 만든다</div></div><div class="card-row"><div class="card-k">액추에이터 경로</div><div class="card-v">/actuator/health/liveness</div></div></div>
+</div></div><div class="key">startup 은 미루고, readiness 는 빼고, liveness 는 죽인다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">03 · 컨테이너화와 배포</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">03 · 컨테이너화와 배포</div><h2>startupProbe 가 없으면 <span class="hi">부팅 루프</span>가 만들어진다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" role="img" aria-label="startupProbe, readinessProbe, livenessProbe가 동작하는 시간 구간">
+      <rect width="960" height="330" fill="#ffffff"/>
+
+      <!-- 타임라인 -->
+      <line x1="120" y1="290" x2="920" y2="290" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="120" y="314" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">0초</text>
+      <text x="400" y="314" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">기동 완료(약 8초)</text>
+      <text x="880" y="314" text-anchor="end" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">운영 중</text>
+      <line x1="440" y1="60" x2="440" y2="290" stroke="#d8dbe0" stroke-width="1" stroke-dasharray="4 3"/>
+
+      <!-- startup -->
+      <rect x="120" y="70" width="320" height="52" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="136" y="92" font-family="ui-monospace,monospace" font-size="12.5" fill="#1f4d8f">startupProbe</text>
+      <text x="136" y="112" font-size="12" fill="#15181d">기동이 끝날 때까지 다른 프로브를 막아준다</text>
+      <text x="452" y="100" font-size="12" fill="#585f6b">성공하면 역할이 끝나고 다시 실행되지 않는다</text>
+
+      <!-- readiness -->
+      <rect x="440" y="140" width="480" height="52" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="456" y="162" font-family="ui-monospace,monospace" font-size="12.5" fill="#2e7d4f">readinessProbe</text>
+      <text x="456" y="182" font-size="12" fill="#15181d">실패하면 서비스 엔드포인트에서 빠진다 — 재시작은 없음</text>
+      <text x="128" y="172" font-size="12" fill="#585f6b">기동 중에는 판정하지 않음</text>
+
+      <!-- liveness -->
+      <rect x="440" y="210" width="480" height="52" fill="#ffffff" stroke="#8f4408" stroke-width="1.5"/>
+      <text x="456" y="232" font-family="ui-monospace,monospace" font-size="12.5" fill="#8f4408">livenessProbe</text>
+      <text x="456" y="252" font-size="12" fill="#15181d">실패하면 컨테이너를 재시작한다 — 가장 위험한 프로브</text>
+      <text x="128" y="242" font-size="12" fill="#585f6b">기동 중에는 판정하지 않음</text>
+
+      <text x="120" y="42" font-size="13" fill="#15181d">세 프로브가 겹치지 않게 시간을 나눠 갖는다</text>
+    </svg></div></div><div class="key">livenessProbe 가 기동 중인 앱을 죽은 것으로 보고 재시작시킨다 - 스프링 앱에 프로브를 걸 때 가장 흔한 사고다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">03 · 컨테이너화와 배포</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">03 · 컨테이너화와 배포</div><h2>이미지 크기 — Dockerfile 네 개</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 250" role="img" aria-label="빌드 방식 네 가지의 최종 이미지 크기 비교 막대">
+  <rect width="960" height="250" fill="#ffffff"/>
+  <text x="24" y="80" font-family="sans-serif" font-size="15" fill="#15181d" text-anchor="start" font-weight="400">한 스테이지에서 빌드까지</text>
+  <rect x="300" y="60" width="620.0" height="26" rx="0" fill="#8f4408" stroke="none" stroke-width="0"/>
+  <text x="930.0" y="79" font-family="ui-monospace,monospace" font-size="15" fill="#8f4408" text-anchor="start" font-weight="600">1.02GB</text>
+  <text x="300" y="104" font-family="sans-serif" font-size="13" fill="#585f6b" text-anchor="start" font-weight="400">JDK · 메이븐 · 소스 · 의존성 캐시 · jar</text>
+  <text x="24" y="138" font-family="sans-serif" font-size="15" fill="#15181d" text-anchor="start" font-weight="400">미리 빌드한 jar 만 복사</text>
+  <rect x="300" y="118" width="288.7254901960784" height="26" rx="0" fill="#2e7d4f" stroke="none" stroke-width="0"/>
+  <text x="598.7254901960785" y="137" font-family="ui-monospace,monospace" font-size="15" fill="#15181d" text-anchor="start" font-weight="600">475MB</text>
+  <text x="300" y="162" font-family="sans-serif" font-size="13" fill="#585f6b" text-anchor="start" font-weight="400">JRE · jar</text>
+  <text x="24" y="196" font-family="sans-serif" font-size="15" fill="#15181d" text-anchor="start" font-weight="400">멀티스테이지</text>
+  <rect x="300" y="176" width="288.7254901960784" height="26" rx="0" fill="#2e7d4f" stroke="none" stroke-width="0"/>
+  <text x="598.7254901960785" y="195" font-family="ui-monospace,monospace" font-size="15" fill="#15181d" text-anchor="start" font-weight="600">475MB</text>
+  <text x="300" y="220" font-family="sans-serif" font-size="13" fill="#585f6b" text-anchor="start" font-weight="400">JRE · jar (빌드는 이미지 안에서)</text>
+  <text x="24" y="254" font-family="sans-serif" font-size="15" fill="#15181d" text-anchor="start" font-weight="400">빌드팩 (이 실습)</text>
+  <rect x="300" y="234" width="167.76470588235293" height="26" rx="0" fill="#2e7d4f" stroke="none" stroke-width="0"/>
+  <text x="477.7647058823529" y="253" font-family="ui-monospace,monospace" font-size="15" fill="#15181d" text-anchor="start" font-weight="600">276MB</text>
+  <text x="300" y="278" font-family="sans-serif" font-size="13" fill="#585f6b" text-anchor="start" font-weight="400">JRE · 계층 분리된 앱</text>
+</svg></div></div><div class="key">naive 는 JDK·메이븐·소스가 전부 남는다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">03 · 컨테이너화와 배포</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">03 · 컨테이너화와 배포</div><h2>배포와 검증</h2><div class="body"><div class="lead wide">뜨지 않으면 <b>이벤트부터</b> 읽는다<div style="font-size:24px;color:var(--muted);margin-top:22px;line-height:1.6"><code>kubectl rollout status</code> 로 기다리고<br><code>kubectl describe pod</code> 의 Events 가 이유를 말한다</div></div></div><div class="key">뜨지 않으면 이벤트부터 읽는다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">03 · 컨테이너화와 배포</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide sec">
+<div class="slide-inner sec"><div class="cnum">04</div><h1>프로메테우스 스택 설치</h1><div class="sub"><span>04-01</span>메모리 사용량이 왜 두 군데서 다른가<br><span>04-02</span>기계의 상태와 API 서버가 아는 상태<br><span>04-03</span>metrics-server 는 과거를 모른다<br><span>04-04</span>오퍼레이터는 스크레이프하지 않는다<br><span>04-05</span>타깃 검증이 이 장의 핵심<br></div></div>
+<div class="slide-footer"><span class="slide-footer-left">SECTION 04</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">04 · 프로메테우스 스택 설치</div><h2>메모리 사용량이 왜 두 군데서 다른가</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 282" role="img" aria-label="메모리 사용량을 알려주는 네 가지 출처와 각각의 이름 접두사">
+  <rect width="960" height="282" fill="#ffffff"/>
+  <defs><marker id="gap-04-01-a0401" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#585f6b"/></marker></defs>
+  <rect x="330" y="24" width="300" height="46" rx="0" fill="none" stroke="#1a4fa0" stroke-width="1.5"/>
+  <text x="480" y="53" font-family="ui-monospace,monospace" font-size="16" fill="#1a4fa0" text-anchor="middle" font-weight="400">"메모리가 얼마나 쓰였나?"</text>
+  <rect x="24" y="128" width="216" height="130" rx="0" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="38" y="156" font-family="ui-monospace,monospace" font-size="15" fill="#15181d" text-anchor="start" font-weight="600">cAdvisor</text>
+  <text x="38" y="182" font-family="ui-monospace,monospace" font-size="14" fill="#1a4fa0" text-anchor="start" font-weight="400">container_</text>
+  <text x="38" y="208" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">컨테이너의 실제 자원 사용</text>
+  <text x="38" y="250" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">노드마다 (kubelet 내장)</text>
+  <line x1="132" y1="122" x2="132" y2="76" stroke="#585f6b" stroke-width="1.8" marker-end="url(#gap-04-01-a0401)"/>
+  <rect x="258" y="128" width="216" height="130" rx="0" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="272" y="156" font-family="ui-monospace,monospace" font-size="15" fill="#15181d" text-anchor="start" font-weight="600">metrics-server</text>
+  <text x="272" y="182" font-family="ui-monospace,monospace" font-size="14" fill="#1a4fa0" text-anchor="start" font-weight="400">(API 전용)</text>
+  <text x="272" y="208" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">리소스 메트릭 API. kubectl top</text>
+  <text x="272" y="225" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">과 HPA 가 쓴다</text>
+  <text x="272" y="250" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">클러스터에 하나</text>
+  <line x1="366" y1="122" x2="366" y2="76" stroke="#585f6b" stroke-width="1.8" marker-end="url(#gap-04-01-a0401)"/>
+  <rect x="492" y="128" width="216" height="130" rx="0" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="506" y="156" font-family="ui-monospace,monospace" font-size="15" fill="#15181d" text-anchor="start" font-weight="600">node-exporter</text>
+  <text x="506" y="182" font-family="ui-monospace,monospace" font-size="14" fill="#1a4fa0" text-anchor="start" font-weight="400">node_</text>
+  <text x="506" y="208" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">기계의 상태 — 메모리가 몇 바이트 남았는가</text>
+  <text x="506" y="250" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">노드마다 (DaemonSet)</text>
+  <line x1="600" y1="122" x2="600" y2="76" stroke="#585f6b" stroke-width="1.8" marker-end="url(#gap-04-01-a0401)"/>
+  <rect x="726" y="128" width="216" height="130" rx="0" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="740" y="156" font-family="ui-monospace,monospace" font-size="15" fill="#15181d" text-anchor="start" font-weight="600">kube-state-metrics</text>
+  <text x="740" y="182" font-family="ui-monospace,monospace" font-size="14" fill="#1a4fa0" text-anchor="start" font-weight="400">kube_</text>
+  <text x="740" y="208" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">API 서버가 아는 상태 — 원한 3개 중</text>
+  <text x="740" y="225" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">실제 2개인가</text>
+  <text x="740" y="250" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">클러스터에 하나</text>
+  <line x1="834" y1="122" x2="834" y2="76" stroke="#585f6b" stroke-width="1.8" marker-end="url(#gap-04-01-a0401)"/>
+  <text x="24" y="300" font-family="sans-serif" font-size="15" fill="#15181d" text-anchor="start" font-weight="400">같은 질문에 네 곳이 서로 다른 숫자로 답한다. 무엇을 재는지가 다르다.</text>
+</svg></div></div><div class="key">cAdvisor · metrics-server · node-exporter · kube-state-metrics</div></div>
+<div class="slide-footer"><span class="slide-footer-left">04 · 프로메테우스 스택 설치</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">04 · 프로메테우스 스택 설치</div><h2>기계의 상태와 API 서버가 아는 상태</h2><div class="body"><div class="cols"><div><div class="col-head">node-exporter — 기계의 상태</div><div class="lead wide">메모리가<br><b>몇 바이트</b> 남았나</div></div><div><div class="col-head">kube-state-metrics — API 서버가 아는 상태</div><div class="lead wide">레플리카 3개를 원하는데<br><b>실제로 2개</b>인가</div></div></div></div><div class="key">'메모리가 몇 바이트 남았나' vs '레플리카 3개를 원하는데 실제로 2개인가'</div></div>
+<div class="slide-footer"><span class="slide-footer-left">04 · 프로메테우스 스택 설치</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">04 · 프로메테우스 스택 설치</div><h2>metrics-server 는 과거를 모른다</h2><div class="body"><div class="lead wide">metrics-server 는 <b>현재값만</b> 갖는다<div style="font-size:24px;color:var(--muted);margin-top:22px;line-height:1.6"><code>kubectl top</code> 과 HPA 를 위한 리소스 메트릭 API.<br>과거 구간을 저장하는 것은 프로메테우스의 일이다</div></div></div><div class="key">'10분 전 CPU는?' 에 답하지 못한다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">04 · 프로메테우스 스택 설치</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">04 · 프로메테우스 스택 설치</div><h2>오퍼레이터는 스크레이프하지 않는다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 340" role="img" aria-label="오퍼레이터가 ServiceMonitor를 읽어 프로메테우스 설정을 생성하고, 프로메테우스가 대상을 스크레이프하는 흐름">
+      <rect width="960" height="340" fill="#ffffff"/>
+
+      <rect x="24" y="52" width="212" height="96" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="40" y="78" font-size="13.5" fill="#15181d">1. 사람이 선언</text>
+      <text x="40" y="100" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">ServiceMonitor</text>
+      <text x="40" y="120" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">PrometheusRule</text>
+      <text x="40" y="140" font-size="11.5" fill="#585f6b">kubectl apply</text>
+
+      <path d="M238 100 L296 100" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch04-fig1-q1)"/>
+
+      <rect x="298" y="52" width="212" height="96" fill="#ffffff" stroke="#6a4a9c" stroke-width="1.5"/>
+      <text x="314" y="78" font-size="13.5" fill="#15181d">2. 오퍼레이터</text>
+      <text x="314" y="100" font-size="11.5" fill="#585f6b">CRD를 감시하다가</text>
+      <text x="314" y="120" font-size="11.5" fill="#585f6b">스크레이프 설정을 만들어</text>
+      <text x="314" y="140" font-size="11.5" fill="#585f6b">Secret으로 저장</text>
+
+      <path d="M512 100 L570 100" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch04-fig1-q1)"/>
+
+      <rect x="572" y="52" width="212" height="96" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="588" y="78" font-size="13.5" fill="#15181d">3. 프로메테우스</text>
+      <text x="588" y="100" font-size="11.5" fill="#585f6b">설정을 리로드하고</text>
+      <text x="588" y="120" font-size="11.5" fill="#585f6b">직접 HTTP 요청을 보내</text>
+      <text x="588" y="140" font-size="11.5" fill="#585f6b">메트릭을 가져온다</text>
+
+      <path d="M678 150 L678 196" fill="none" stroke="#2e7d4f" stroke-width="1.5" marker-end="url(#ch04-fig1-q2)"/>
+      <text x="690" y="178" font-family="ui-monospace,monospace" font-size="11" fill="#2e7d4f">GET /metrics</text>
+
+      <rect x="572" y="198" width="212" height="62" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="588" y="224" font-size="13" fill="#15181d">타깃 (파드·노드·컨트롤 플레인)</text>
+      <text x="588" y="246" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">여기서 실패하면 up == 0</text>
+
+      <line x1="24" y1="286" x2="936" y2="286" stroke="#d8dbe0" stroke-width="1"/>
+      <text x="24" y="312" font-size="12.5" fill="#15181d">타깃이 안 보일 때 의심할 곳: ① 선언이 잘못됨 ② 오퍼레이터가 선택하지 않음 ③ 네트워크·인증 실패</text>
+
+      <defs>
+        <marker id="ch04-fig1-q1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#585f6b"/>
+        </marker>
+        <marker id="ch04-fig1-q2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#2e7d4f"/>
+        </marker>
+      </defs>
+    </svg><div class="fig-cap">오퍼레이터는 CR 을 읽어 설정을 만들어 줄 뿐, 직접 스크레이프하지 않는다</div></div></div><div class="key">오퍼레이터는 CR 을 읽어 설정을 만들어 줄 뿐이다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">04 · 프로메테우스 스택 설치</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">04 · 프로메테우스 스택 설치</div><h2>타깃 검증이 이 장의 핵심</h2><div class="body"><pre>job 별 타깃 수
+
+kube-controller-manager     1<span class="dim">      ← 01장 bind-address 를 고쳐야 잡힌다</span>
+kube-etcd                   1<span class="dim">      ←</span>
+kube-proxy                  3<span class="dim">      ←</span>
+kube-scheduler              1<span class="dim">      ←</span>
+kubelet                     3
+node-exporter               3
+kube-state-metrics          1
+...</pre><div class="verdict-note"><b>판정</b> — 위 네 줄이 0 이면 01장 설정이 빠진 것이다.</div></div><div class="key">01장 설정이 여기서 결과로 나온다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">04 · 프로메테우스 스택 설치</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide sec">
+<div class="slide-inner sec"><div class="cnum">05</div><h1>그라파나와 대시보드</h1><div class="sub"><span>05-01</span>UI 에서 만든 대시보드는 클러스터와 함께 사라진다<br><span>05-02</span>라벨 하나를 빼면 아무 일도 일어나지 않는다<br><span>05-03</span>데이터소스는 uid 로 참조한다<br></div></div>
+<div class="slide-footer"><span class="slide-footer-left">SECTION 05</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">05 · 그라파나와 대시보드</div><h2>UI 에서 만든 대시보드는 클러스터와 함께 사라진다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" role="img" aria-label="라벨이 붙은 ConfigMap을 사이드카가 감시해 공유 볼륨에 파일로 쓰고 그라파나가 읽는 구조">
+      <rect width="960" height="360" fill="#ffffff"/>
+
+      <!-- ConfigMap -->
+      <rect x="24" y="60" width="230" height="150" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="40" y="86" font-size="13.5" fill="#15181d">ConfigMap</text>
+      <text x="40" y="110" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">metadata:</text>
+      <text x="52" y="130" font-family="ui-monospace,monospace" font-size="11" fill="#1a4fa0">labels:</text>
+      <text x="64" y="150" font-family="ui-monospace,monospace" font-size="11" fill="#1a4fa0">grafana_dashboard: "1"</text>
+      <text x="40" y="174" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">data:</text>
+      <text x="52" y="194" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">board.json: { ... }</text>
+
+      <path d="M256 132 L318 132" fill="none" stroke="#6a4a9c" stroke-width="1.5" marker-end="url(#ch05-fig1-r1)"/>
+      <text x="287" y="122" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10.5" fill="#6a4a9c">watch</text>
+
+      <!-- 파드 -->
+      <rect x="320" y="40" width="614" height="248" fill="none" stroke="#9aa1ad" stroke-width="1.5" stroke-dasharray="6 4"/>
+      <text x="336" y="30" font-family="ui-monospace,monospace" font-size="12" fill="#585f6b">grafana 파드</text>
+
+      <rect x="344" y="70" width="248" height="76" fill="#ffffff" stroke="#6a4a9c" stroke-width="1.5"/>
+      <text x="360" y="96" font-size="13" fill="#15181d">사이드카</text>
+      <text x="360" y="118" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">grafana-sc-dashboard</text>
+      <text x="360" y="136" font-size="11" fill="#585f6b">라벨을 감시해 파일로 저장</text>
+
+      <path d="M468 148 L468 186" fill="none" stroke="#6a4a9c" stroke-width="1.5" marker-end="url(#ch05-fig1-r1)"/>
+      <text x="480" y="172" font-family="ui-monospace,monospace" font-size="10.5" fill="#6a4a9c">write</text>
+
+      <rect x="344" y="188" width="248" height="72" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="360" y="214" font-size="13" fill="#15181d">공유 볼륨 (emptyDir)</text>
+      <text x="360" y="238" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">/tmp/dashboards/*.json</text>
+
+      <path d="M596 224 L668 224" fill="none" stroke="#2e7d4f" stroke-width="1.5" marker-end="url(#ch05-fig1-r2)"/>
+      <text x="632" y="214" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10.5" fill="#2e7d4f">read</text>
+
+      <rect x="670" y="140" width="240" height="120" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="686" y="166" font-size="13.5" fill="#15181d">grafana</text>
+      <text x="686" y="190" font-size="11.5" fill="#585f6b">프로비저닝 경로를 읽어</text>
+      <text x="686" y="210" font-size="11.5" fill="#585f6b">대시보드로 등록</text>
+      <text x="686" y="238" font-family="ui-monospace,monospace" font-size="11" fill="#8f4408">UI에서 편집해도 원본은 ConfigMap</text>
+
+      <line x1="24" y1="308" x2="936" y2="308" stroke="#d8dbe0" stroke-width="1"/>
+      <text x="24" y="334" font-size="12.5" fill="#15181d">파드를 지웠다 살려도 대시보드가 그대로인 이유 — 원본이 클러스터 리소스로 남아 있기 때문이다</text>
+
+      <defs>
+        <marker id="ch05-fig1-r1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#6a4a9c"/>
+        </marker>
+        <marker id="ch05-fig1-r2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#2e7d4f"/>
+        </marker>
+      </defs>
+    </svg><div class="fig-cap">차트가 설치한 기본 대시보드도 전부 이 구조다 — 우리도 같은 방법을 쓴다</div></div></div><div class="key">이 실습은 클러스터를 자주 지운다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">05 · 그라파나와 대시보드</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">05 · 그라파나와 대시보드</div><h2>라벨 하나를 빼면 아무 일도 일어나지 않는다</h2><div class="body"><div class="cards dense">
+<div class="card"><div class="card-h">장 05 대시보드</div><div class="card-row"><div class="card-k">라벨이 빠지면</div><div class="card-v">컨피그맵은 있고 대시보드만 없다</div></div><div class="card-row"><div class="card-k">확인 명령</div><div class="card-v">kubectl -n monitoring get cm -l grafana_dashboard=1</div></div></div>
+<div class="card"><div class="card-h">장 06 ServiceMonitor</div><div class="card-row"><div class="card-k">라벨이 빠지면</div><div class="card-v">타깃이 0개. 오류 없음</div></div><div class="card-row"><div class="card-k">확인 명령</div><div class="card-v">프로메테우스 UI 의 Service Discovery</div></div></div>
+<div class="card"><div class="card-h">장 07 PrometheusRule</div><div class="card-row"><div class="card-k">라벨이 빠지면</div><div class="card-v">규칙이 조용히 무시된다</div></div><div class="card-row"><div class="card-k">확인 명령</div><div class="card-v">프로메테우스 /rules 화면</div></div></div>
+</div></div><div class="key">에러도 없고 이벤트도 없다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">05 · 그라파나와 대시보드</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">05 · 그라파나와 대시보드</div><h2>데이터소스는 uid 로 참조한다</h2><div class="body"><pre><span class="dim">// 이름이 아니라 uid 로 참조한다. 이름은 환경마다 다를 수 있다.</span>
+"datasource": {
+  "type": "prometheus",
+  "uid": "${datasource}"<span class="dim">      // datasource 타입 변수를 두면 uid 를 박지 않아도 된다</span>
+}</pre></div><div class="key">이름으로 적으면 다른 클러스터에서 깨진다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">05 · 그라파나와 대시보드</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">05 · 그라파나와 대시보드</div><h2>Export 옵션 하나가 uid 를 <span class="hi">변수로</span> 바꾼다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 240" role="img" aria-label="UI에서 편집하고 JSON으로 내보내 ConfigMap으로 저장하는 순환 흐름">
+      <rect width="960" height="240" fill="#ffffff"/>
+
+      <rect x="24" y="60" width="196" height="72" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="40" y="88" font-size="13" fill="#15181d">1. UI에서 편집</text>
+      <text x="40" y="112" font-size="11.5" fill="#585f6b">패널·질의를 눈으로 조정</text>
+
+      <path d="M222 96 L272 96" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch05-fig2-v1)"/>
+
+      <rect x="274" y="60" width="196" height="72" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="290" y="88" font-size="13" fill="#15181d">2. JSON 내보내기</text>
+      <text x="290" y="112" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">Export → Save to file</text>
+
+      <path d="M472 96 L522 96" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch05-fig2-v1)"/>
+
+      <rect x="524" y="60" width="196" height="72" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="540" y="88" font-size="13" fill="#15181d">3. ConfigMap 갱신</text>
+      <text x="540" y="112" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">git commit → apply</text>
+
+      <path d="M722 96 L772 96" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch05-fig2-v1)"/>
+
+      <rect x="774" y="60" width="162" height="72" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="790" y="88" font-size="13" fill="#15181d">4. 자동 반영</text>
+      <text x="790" y="112" font-size="11.5" fill="#585f6b">사이드카가 감지</text>
+
+      <path d="M855 134 L855 176 L122 176 L122 134" fill="none" stroke="#585f6b" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#ch05-fig2-v1)"/>
+      <text x="489" y="196" text-anchor="middle" font-size="12" fill="#585f6b">다시 고칠 일이 생기면 1번으로</text>
+
+      <text x="24" y="38" font-size="13" fill="#15181d">UI는 편집기로만 쓰고, 진실의 원본은 저장소에 둔다</text>
+
+      <defs>
+        <marker id="ch05-fig2-v1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#585f6b"/>
+        </marker>
+      </defs>
+    </svg></div></div><div class="key">Export for sharing externally 를 켜면 <code>${DS_...}</code> 로 치환된다 - 팀 밖으로 줄 때만 켜고, 우리끼리는 끄는 편이 임포트가 간단하다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">05 · 그라파나와 대시보드</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide sec">
+<div class="slide-inner sec"><div class="cnum">06</div><h1>앱 메트릭과 PromQL</h1><div class="sub"><span>06-01</span>에러 없이 타깃이 사라진다<br><span>06-02</span>어느 겹이 끊겼는지 보는 법<br><span>06-03</span>포트는 번호가 아니라 이름이다<br><span>06-04</span>프로메테우스가 붙여 주는 라벨<br><span>06-05</span>RED 를 PromQL 로<br></div></div>
+<div class="slide-footer"><span class="slide-footer-left">SECTION 06</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">06 · 앱 메트릭과 PromQL</div><h2>에러 없이 타깃이 사라진다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" role="img" aria-label="프로메테우스 CR, ServiceMonitor, Service, 파드로 이어지는 라벨 연결 구조">
+      <rect width="960" height="430" fill="#ffffff"/>
+
+      <!-- Prometheus CR -->
+      <rect x="24" y="30" width="400" height="86" fill="#ffffff" stroke="#6a4a9c" stroke-width="1.5"/>
+      <text x="40" y="56" font-size="13.5" fill="#15181d">Prometheus (CR)</text>
+      <text x="40" y="80" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">serviceMonitorSelector:</text>
+      <text x="52" y="100" font-family="ui-monospace,monospace" font-size="11" fill="#6a4a9c">release: kps</text>
+
+      <!-- ① -->
+      <path d="M224 118 L224 152" fill="none" stroke="#6a4a9c" stroke-width="1.5" marker-end="url(#ch06-fig1-z1)"/>
+      <circle cx="248" cy="135" r="11" fill="#ffffff" stroke="#6a4a9c" stroke-width="1.5"/>
+      <text x="248" y="140" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="#6a4a9c">1</text>
+      <text x="268" y="140" font-size="12" fill="#585f6b">오퍼레이터가 고를 것인가</text>
+
+      <!-- ServiceMonitor -->
+      <rect x="24" y="154" width="400" height="126" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="40" y="180" font-size="13.5" fill="#15181d">ServiceMonitor</text>
+      <text x="40" y="204" font-family="ui-monospace,monospace" font-size="11" fill="#6a4a9c">labels: {release: kps}</text>
+      <text x="40" y="226" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">selector.matchLabels:</text>
+      <text x="52" y="246" font-family="ui-monospace,monospace" font-size="11" fill="#1f4d8f">app.kubernetes.io/name: order-api</text>
+      <text x="40" y="268" font-family="ui-monospace,monospace" font-size="11" fill="#2e7d4f">endpoints[0].port: http</text>
+
+      <!-- ② -->
+      <path d="M224 282 L224 316" fill="none" stroke="#1f4d8f" stroke-width="1.5" marker-end="url(#ch06-fig1-z2)"/>
+      <circle cx="248" cy="299" r="11" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="248" y="304" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="#1f4d8f">2</text>
+      <text x="268" y="304" font-size="12" fill="#585f6b">이 라벨을 가진 Service가 있는가</text>
+
+      <!-- Service -->
+      <rect x="24" y="318" width="400" height="94" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="40" y="344" font-size="13.5" fill="#15181d">Service (03장에서 만든 것)</text>
+      <text x="40" y="368" font-family="ui-monospace,monospace" font-size="11" fill="#1f4d8f">labels: {app.kubernetes.io/name: order-api}</text>
+      <text x="40" y="390" font-family="ui-monospace,monospace" font-size="11" fill="#2e7d4f">ports: [{name: http, port: 8080}]</text>
+
+      <!-- ③ -->
+      <path d="M428 365 L494 365" fill="none" stroke="#2e7d4f" stroke-width="1.5" marker-end="url(#ch06-fig1-z3)"/>
+      <circle cx="461" cy="345" r="11" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="461" y="350" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="#2e7d4f">3</text>
+
+      <rect x="496" y="318" width="440" height="94" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="512" y="344" font-size="13.5" fill="#15181d">파드의 엔드포인트</text>
+      <text x="512" y="368" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">10.244.1.7:8080/actuator/prometheus</text>
+      <text x="512" y="390" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">10.244.1.9:8080/actuator/prometheus</text>
+
+      <!-- 우측 설명 -->
+      <rect x="496" y="30" width="440" height="250" fill="#f5f6f7" stroke="#d8dbe0" stroke-width="1"/>
+      <text x="516" y="58" font-size="13.5" fill="#15181d">어긋났을 때의 증상</text>
+      <text x="516" y="88" font-family="ui-monospace,monospace" font-size="11.5" fill="#6a4a9c">1 실패</text>
+      <text x="516" y="108" font-size="12" fill="#585f6b">타깃 목록에 아예 나타나지 않는다. 오류도 없다</text>
+      <text x="516" y="140" font-family="ui-monospace,monospace" font-size="11.5" fill="#1f4d8f">2 실패</text>
+      <text x="516" y="160" font-size="12" fill="#585f6b">타깃 그룹은 생기지만 대상이 0개다</text>
+      <text x="516" y="192" font-family="ui-monospace,monospace" font-size="11.5" fill="#2e7d4f">3 실패</text>
+      <text x="516" y="212" font-size="12" fill="#585f6b">포트 이름이 없어 스크레이프 주소가 만들어지지 않는다</text>
+      <text x="516" y="248" font-size="12" fill="#8f4408">셋 다 "조용히" 실패한다 — 그래서 확인 순서가 중요하다</text>
+
+      <defs>
+        <marker id="ch06-fig1-z1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#6a4a9c"/>
+        </marker>
+        <marker id="ch06-fig1-z2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#1f4d8f"/>
+        </marker>
+        <marker id="ch06-fig1-z3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#2e7d4f"/>
+        </marker>
+      </defs>
+    </svg><div class="fig-cap">①②③ 세 겹이 전부 맞아야 타깃이 나타난다. 하나만 어긋나도 에러 없이 사라진다</div></div></div><div class="key">연결이 세 겹의 라벨 일치로만 이루어진다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">06 · 앱 메트릭과 PromQL</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">06 · 앱 메트릭과 PromQL</div><h2>오류도 경고도 없이 타깃은 0개다</h2><div class="body"><pre>curl -s --get http://localhost:30900/api/v1/query \
+  --data-urlencode 'query=up{namespace="apps"}' | jq '.data.result | length'
+
+0</pre><pre>serviceMonitorSelector:
+  matchLabels:
+    release: kps</pre><div class="verdict-note"><b>판정</b> — 오류도 경고 로그도 없다. ServiceMonitor 는 정상적으로 만들어져 있다. 프로메테우스 CR 의 셀렉터를 보면 이유가 나온다.</div></div><div class="key">ServiceMonitor 는 정상적으로 만들어져 있다 - 프로메테우스 CR 의 셀렉터를 보면 이유가 나온다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">06 · 앱 메트릭과 PromQL</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">06 · 앱 메트릭과 PromQL</div><h2>어느 겹이 끊겼는지 보는 법</h2><div class="body"><div class="cards dense">
+<div class="card"><div class="card-h">겹 1</div><div class="card-row"><div class="card-k">무엇이 무엇을 고르나</div><div class="card-v">프로메테우스 CR 의 serviceMonitorSelector 가 ServiceMonitor 를</div></div><div class="card-row"><div class="card-k">어긋나면</div><div class="card-v">ServiceMonitor 가 아예 읽히지 않는다</div></div><div class="card-row"><div class="card-k">확인 방법</div><div class="card-v">kubectl get prometheus -o yaml | grep -A4 serviceMonitorSelector</div></div></div>
+<div class="card"><div class="card-h">겹 2</div><div class="card-row"><div class="card-k">무엇이 무엇을 고르나</div><div class="card-v">ServiceMonitor 의 selector 가 서비스를</div></div><div class="card-row"><div class="card-k">어긋나면</div><div class="card-v">타깃이 0개</div></div><div class="card-row"><div class="card-k">확인 방법</div><div class="card-v">프로메테우스 UI 의 Service Discovery</div></div></div>
+<div class="card"><div class="card-h">겹 3</div><div class="card-row"><div class="card-k">무엇이 무엇을 고르나</div><div class="card-v">서비스의 selector 가 파드를</div></div><div class="card-row"><div class="card-k">어긋나면</div><div class="card-v">엔드포인트가 빈다</div></div><div class="card-row"><div class="card-k">확인 방법</div><div class="card-v">kubectl get endpointslices</div></div></div>
+</div></div><div class="key">1겹은 프로메테우스 CR, 2겹은 Service Discovery, 3겹은 endpointslices</div></div>
+<div class="slide-footer"><span class="slide-footer-left">06 · 앱 메트릭과 PromQL</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">06 · 앱 메트릭과 PromQL</div><h2>포트는 번호가 아니라 이름이다</h2><div class="body"><pre>kind: ServiceMonitor
+metadata:
+  labels: { release: kps }<span class="dim">                 # ① 없으면 프로메테우스가 안 읽는다</span>
+spec:
+  selector:
+    matchLabels: { app.kubernetes.io/name: order-api }<span class="dim">   # ② 서비스의 라벨</span>
+  endpoints:
+    - { port: http, path: /actuator/prometheus }<span class="dim">         # ③ 번호가 아니라 이름</span></pre></div><div class="key">숫자를 적으면 조용히 안 붙는다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">06 · 앱 메트릭과 PromQL</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">06 · 앱 메트릭과 PromQL</div><h2>프로메테우스가 붙여 주는 라벨</h2><div class="body"><table class="dense">
+<thead><tr><th>라벨</th><th>어디서 왔나</th></tr></thead>
+<tbody>
+<tr><td>channel</td><td>앱이 직접 붙인 태그 (02장 Counter.builder)</td></tr>
+<tr><td>job</td><td>Service 이름. ServiceMonitor 기반 타깃의 기본 규칙</td></tr>
+<tr><td>namespace / pod / service / container</td><td>쿠버네티스 서비스 디스커버리가 자동으로 부여</td></tr>
+<tr><td>endpoint</td><td>ServiceMonitor 에 쓴 포트 이름</td></tr>
+<tr><td>instance</td><td>스크레이프 대상 주소</td></tr>
+</tbody>
+</table></div><div class="key">파드가 죽고 떠도 같은 job 으로 묶인다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">06 · 앱 메트릭과 PromQL</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">06 · 앱 메트릭과 PromQL</div><h2>pod 는 바뀌어도 job 은 그대로다</h2><div class="body"><pre>{
+  "__name__": "orders_created_total",
+  "channel":   "api",<span class="dim">              ← 앱이 붙인 것</span>
+  "job":       "order-api",        ┐
+  "namespace": "apps",             │ 프로메테우스가 붙인 것
+  "pod":       "order-api-6b8f7d5c9-h4nm2",
+  "service":   "order-api"         ┘
+}</pre><div class="verdict-note"><b>판정</b> — pod 가 바뀌어도 job 은 그대로다. 그래서 하나의 시계열처럼 묶인다.</div></div><div class="key">그래서 파드가 죽고 떠도 하나의 시계열처럼 묶인다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">06 · 앱 메트릭과 PromQL</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">06 · 앱 메트릭과 PromQL</div><h2>RED 를 PromQL 로</h2><div class="body"><pre style="font-size:22px"><span class="dim"># R — 초당 요청 수</span>
+sum by (service) (rate(http_server_requests_seconds_count{namespace="apps"}[5m]))
+
+<span class="dim"># E — 5xx 비율. 표본이 없을 때를 대비해 or vector(0)</span>
+sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+  / sum(rate(http_server_requests_seconds_count[5m])) or vector(0)
+
+<span class="dim"># D — P95. sum by (le) 로 파드별 버킷을 먼저 합친 뒤 계산한다</span>
+histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))</pre></div><div class="key">02장에서 심은 지표가 여기서 그래프가 된다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">06 · 앱 메트릭과 PromQL</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">06 · 앱 메트릭과 PromQL</div><h2>카운터에는 거의 항상 <span class="hi">rate()</span> 를 씌운다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" role="img" aria-label="계속 증가하는 카운터 그래프와 rate 적용 후의 초당 증가량 그래프 비교">
+      <rect width="960" height="330" fill="#ffffff"/>
+
+      <text x="60" y="34" font-size="13" fill="#15181d">원본 카운터 — <tspan font-family="ui-monospace,monospace" font-size="12">orders_created_total</tspan></text>
+      <line x1="60" y1="150" x2="600" y2="150" stroke="#585f6b" stroke-width="1.2"/>
+      <line x1="60" y1="50" x2="60" y2="150" stroke="#585f6b" stroke-width="1.2"/>
+      <polyline points="60,142 128,142 128,130 196,130 196,112 264,112 264,104 332,104 332,84 400,84 400,72 468,72 468,60 536,60 536,56 600,56"
+                fill="none" stroke="#1f4d8f" stroke-width="1.8"/>
+      <text x="612" y="60" font-size="12" fill="#585f6b">계속 증가하기만 한다</text>
+      <text x="612" y="80" font-size="12" fill="#585f6b">"지금 트래픽이 많은가"를</text>
+      <text x="612" y="100" font-size="12" fill="#585f6b">읽어낼 수 없다</text>
+
+      <text x="60" y="204" font-size="13" fill="#15181d">rate() 적용 — <tspan font-family="ui-monospace,monospace" font-size="12">rate(orders_created_total[2m])</tspan></text>
+      <line x1="60" y1="300" x2="600" y2="300" stroke="#585f6b" stroke-width="1.2"/>
+      <line x1="60" y1="220" x2="60" y2="300" stroke="#585f6b" stroke-width="1.2"/>
+      <polyline points="60,278 128,278 196,262 264,286 332,244 400,258 468,250 536,272 600,264"
+                fill="none" stroke="#2e7d4f" stroke-width="1.8"/>
+      <text x="612" y="240" font-size="12" fill="#585f6b">초당 증가량 — 트래픽의 모양</text>
+      <text x="612" y="260" font-size="12" fill="#585f6b">파드가 재시작해 카운터가</text>
+      <text x="612" y="280" font-size="12" fill="#585f6b">0으로 돌아가도 보정해준다</text>
+    </svg></div></div><div class="key">대괄호 안의 시간은 그만큼 돌아보며 평균 낸다는 뜻이다 - 스크레이프 간격의 4배 이상, 30초 간격이면 최소 2분</div></div>
+<div class="slide-footer"><span class="slide-footer-left">06 · 앱 메트릭과 PromQL</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide sec">
+<div class="slide-inner sec"><div class="cnum">07</div><h1>대시보드와 알림</h1><div class="sub"><span>07-01</span>패널 40개짜리 대시보드는 아무도 안 본다<br><span>07-02</span>울리는데 아무도 안 보는 알림<br><span>07-03</span>고장 난 시각과 알림이 온 시각은 다르다<br><span>07-04</span>규칙에도 라벨이 필요하다<br><span>07-05</span>실제로 터뜨려 본다<br></div></div>
+<div class="slide-footer"><span class="slide-footer-left">SECTION 07</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">07 · 대시보드와 알림</div><h2>패널 40개짜리 대시보드는 아무도 안 본다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 380" role="img" aria-label="대시보드를 요약, RED 지표, 상세 순서로 배치하는 레이아웃 구조">
+      <rect width="960" height="380" fill="#ffffff"/>
+
+      <!-- 변수 줄 -->
+      <rect x="24" y="30" width="640" height="38" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="40" y="55" font-family="ui-monospace,monospace" font-size="12" fill="#15181d">namespace: apps ▾   service: All ▾</text>
+      <text x="680" y="55" font-size="12" fill="#585f6b">변수 — 대시보드 하나를 여러 대상에 재사용</text>
+
+      <!-- 1행: 요약 -->
+      <rect x="24" y="82" width="152" height="70" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="100" y="112" text-anchor="middle" font-size="12.5" fill="#15181d">초당 요청</text>
+      <text x="100" y="132" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">stat</text>
+
+      <rect x="186" y="82" width="152" height="70" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="262" y="112" text-anchor="middle" font-size="12.5" fill="#15181d">에러율</text>
+      <text x="262" y="132" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">stat</text>
+
+      <rect x="348" y="82" width="152" height="70" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="424" y="112" text-anchor="middle" font-size="12.5" fill="#15181d">P95 지연</text>
+      <text x="424" y="132" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">stat</text>
+
+      <rect x="510" y="82" width="154" height="70" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="587" y="112" text-anchor="middle" font-size="12.5" fill="#15181d">분당 주문</text>
+      <text x="587" y="132" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">stat</text>
+
+      <text x="680" y="122" font-size="12" fill="#15181d">① 지금 문제가 있는가 — 3초</text>
+
+      <!-- 2행: 시계열 -->
+      <rect x="24" y="166" width="316" height="96" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="182" y="204" text-anchor="middle" font-size="12.5" fill="#15181d">서비스별 처리율 추이</text>
+      <text x="182" y="226" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">timeseries</text>
+
+      <rect x="348" y="166" width="316" height="96" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="506" y="204" text-anchor="middle" font-size="12.5" fill="#15181d">서비스별 P95 / P99</text>
+      <text x="506" y="226" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">timeseries</text>
+
+      <text x="680" y="216" font-size="12" fill="#15181d">② 언제부터, 어느 서비스인가</text>
+
+      <!-- 3행: 상세 -->
+      <rect x="24" y="276" width="640" height="80" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="344" y="310" text-anchor="middle" font-size="12.5" fill="#15181d">엔드포인트별 P99 상위 5개</text>
+      <text x="344" y="332" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">timeseries</text>
+
+      <text x="680" y="316" font-size="12" fill="#15181d">③ 어느 요청이 범인인가</text>
+    </svg><div class="fig-cap">패널 일곱 개. 더 넣고 싶으면 먼저 지울 것을 찾는다</div></div></div><div class="key">한 화면은 하나의 질문에 답해야 한다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">07 · 대시보드와 알림</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">07 · 대시보드와 알림</div><h2>울리는데 아무도 안 보는 알림</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" role="img" aria-label="알림 수가 늘수록 대응률이 떨어지는 곡선">
+  <rect width="960" height="300" fill="#ffffff"/>
+  <line x1="90" y1="50" x2="90" y2="226" stroke="#585f6b" stroke-width="1.2"/>
+  <line x1="90" y1="226" x2="880" y2="226" stroke="#585f6b" stroke-width="1.2"/>
+  <polyline points="90,60 150,66 230,84 330,118 430,158 550,186 690,204 830,212 876,214" fill="none" stroke="#8f4408" stroke-width="2.2"/>
+  <text x="96" y="44" font-family="ui-monospace,monospace" font-size="13" fill="#585f6b" text-anchor="start" font-weight="400">대응률</text>
+  <text x="880" y="248" font-family="ui-monospace,monospace" font-size="13" fill="#585f6b" text-anchor="end" font-weight="400">하루 알림 수</text>
+  <text x="100" y="248" font-family="ui-monospace,monospace" font-size="13" fill="#585f6b" text-anchor="start" font-weight="400">몇 건</text>
+  <line x1="430" y1="50" x2="430" y2="226" stroke="#585f6b" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="440" y="70" font-family="ui-monospace,monospace" font-size="14" fill="#8f4408" text-anchor="start" font-weight="400">여기서부터 무시하기 시작한다</text>
+  <text x="440" y="92" font-family="ui-monospace,monospace" font-size="14" fill="#8f4408" text-anchor="start" font-weight="400">진짜 알림까지 같이</text>
+  <text x="24" y="276" font-family="sans-serif" font-size="15" fill="#15181d" text-anchor="start" font-weight="400">울리는데 아무도 안 보는 알림은 없는 것보다 나쁘다.</text>
+</svg></div></div><div class="key">진짜 알림까지 같이 무시하게 만든다. 없는 것보다 나쁘다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">07 · 대시보드와 알림</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">07 · 대시보드와 알림</div><h2>고장 난 시각과 알림이 온 시각은 다르다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 270" role="img" aria-label="고장 시각부터 알림 도착까지 네 구간 타임라인">
+  <rect width="960" height="270" fill="#ffffff"/>
+  <defs><marker id="gap-07-03-a0703" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#585f6b"/></marker></defs>
+  <rect x="40" y="120" width="180" height="52" rx="0" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="52" y="144" font-family="sans-serif" font-size="14" fill="#15181d" text-anchor="start" font-weight="400">스크레이프 간격</text>
+  <text x="52" y="164" font-family="ui-monospace,monospace" font-size="15" fill="#1a4fa0" text-anchor="start" font-weight="600">30s</text>
+  <text x="52" y="204" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">이상이 메트릭에 반영되기까지</text>
+  <rect x="228" y="120" width="180" height="52" rx="0" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="240" y="144" font-family="sans-serif" font-size="14" fill="#15181d" text-anchor="start" font-weight="400">규칙 평가 주기</text>
+  <text x="240" y="164" font-family="ui-monospace,monospace" font-size="15" fill="#1a4fa0" text-anchor="start" font-weight="600">30s</text>
+  <text x="240" y="204" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">프로메테우스가 조건을 다시</text>
+  <text x="240" y="221" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">계산하기까지</text>
+  <rect x="416" y="120" width="300" height="52" rx="0" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="428" y="144" font-family="sans-serif" font-size="14" fill="#15181d" text-anchor="start" font-weight="400">for</text>
+  <text x="428" y="164" font-family="ui-monospace,monospace" font-size="15" fill="#1a4fa0" text-anchor="start" font-weight="600">2m</text>
+  <text x="428" y="204" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">조건이 계속 참이어야 하는 시간. 순간적인 튐을 걸러낸다</text>
+  <rect x="724" y="120" width="180" height="52" rx="0" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="736" y="144" font-family="sans-serif" font-size="14" fill="#15181d" text-anchor="start" font-weight="400">group_wait</text>
+  <text x="736" y="164" font-family="ui-monospace,monospace" font-size="15" fill="#1a4fa0" text-anchor="start" font-weight="600">30s</text>
+  <text x="736" y="204" font-family="sans-serif" font-size="12" fill="#585f6b" text-anchor="start" font-weight="400">알림매니저가 같은 그룹을 모으는 시간</text>
+  <line x1="40" y1="96" x2="904" y2="96" stroke="#585f6b" stroke-width="1.5"/>
+  <text x="40" y="86" font-family="ui-monospace,monospace" font-size="14" fill="#8f4408" text-anchor="start" font-weight="400">고장</text>
+  <text x="904" y="86" font-family="ui-monospace,monospace" font-size="14" fill="#1a4fa0" text-anchor="end" font-weight="400">알림 도착</text>
+  <text x="40" y="60" font-family="ui-monospace,monospace" font-size="16" fill="#15181d" text-anchor="start" font-weight="600">합계 30s + 30s + 2m + 30s — 3분 30초</text>
+</svg></div></div><div class="key">스크레이프 간격 · 평가 주기 · for · group_wait</div></div>
+<div class="slide-footer"><span class="slide-footer-left">07 · 대시보드와 알림</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">07 · 대시보드와 알림</div><h2>규칙에도 라벨이 필요하다</h2><div class="body"><div class="lead wide">규칙에도 <b>release 라벨</b>이 필요하다<div style="font-size:24px;color:var(--muted);margin-top:22px;line-height:1.6"><code>metadata.labels.release: kps</code><br>프로메테우스 CR 의 <code>ruleSelector</code> 가 이 라벨로 규칙을 고른다</div></div></div><div class="key">조용히 무시된다. 05장과 같은 함정</div></div>
+<div class="slide-footer"><span class="slide-footer-left">07 · 대시보드와 알림</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">07 · 대시보드와 알림</div><h2>실제로 터뜨려 본다</h2><div class="body"><pre>AppTargetDown         inactive
+AppHighErrorRate      inactive       →  pending  →  firing
+AppHighLatencyP95     inactive
+OrderRejectionSpike   inactive</pre><div class="verdict-note"><b>판정</b> — 에러 주입 후 pending 에서 firing 까지 2분.  for: 2m 의 효과다. pending 은 프로메테우스 /alerts 화면에서 눈으로 확인한다.</div></div><div class="key">pending → firing 을 눈으로 본다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">07 · 대시보드와 알림</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">07 · 대시보드와 알림</div><h2>pending 을 <span class="hi">눈으로</span> 보는 것이 가장 빠르다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" role="img" aria-label="알림이 inactive에서 pending을 거쳐 firing으로 바뀌는 시간 흐름">
+      <rect width="960" height="300" fill="#ffffff"/>
+
+      <text x="24" y="34" font-size="13" fill="#15181d">규칙: 에러율 &gt; 5%, <tspan font-family="ui-monospace,monospace" font-size="12">for: 2m</tspan></text>
+
+      <!-- 조건 라인 -->
+      <text x="24" y="72" font-size="12" fill="#585f6b">조건 충족 여부</text>
+      <line x1="150" y1="66" x2="920" y2="66" stroke="#d8dbe0" stroke-width="1"/>
+      <rect x="150" y="56" width="90" height="20" fill="#ffffff" stroke="#585f6b" stroke-width="1"/>
+      <text x="195" y="71" text-anchor="middle" font-size="11" fill="#585f6b">거짓</text>
+      <rect x="240" y="56" width="60" height="20" fill="#f5f6f7" stroke="#8f4408" stroke-width="1.5"/>
+      <text x="270" y="71" text-anchor="middle" font-size="11" fill="#8f4408">참</text>
+      <rect x="300" y="56" width="60" height="20" fill="#ffffff" stroke="#585f6b" stroke-width="1"/>
+      <text x="330" y="71" text-anchor="middle" font-size="11" fill="#585f6b">거짓</text>
+      <rect x="360" y="56" width="380" height="20" fill="#f5f6f7" stroke="#8f4408" stroke-width="1.5"/>
+      <text x="550" y="71" text-anchor="middle" font-size="11" fill="#8f4408">참 (계속 유지)</text>
+      <rect x="740" y="56" width="180" height="20" fill="#ffffff" stroke="#585f6b" stroke-width="1"/>
+      <text x="830" y="71" text-anchor="middle" font-size="11" fill="#585f6b">거짓</text>
+
+      <!-- 상태 라인 -->
+      <text x="24" y="140" font-size="12" fill="#585f6b">알림 상태</text>
+      <rect x="150" y="124" width="90" height="26" fill="#ffffff" stroke="#585f6b" stroke-width="1"/>
+      <text x="195" y="142" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">inactive</text>
+      <rect x="240" y="124" width="60" height="26" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="270" y="142" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10.5" fill="#1f4d8f">pending</text>
+      <rect x="300" y="124" width="60" height="26" fill="#ffffff" stroke="#585f6b" stroke-width="1"/>
+      <text x="330" y="142" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10.5" fill="#585f6b">inactive</text>
+      <rect x="360" y="124" width="140" height="26" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="430" y="142" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#1f4d8f">pending (2분)</text>
+      <rect x="500" y="124" width="240" height="26" fill="#ffffff" stroke="#8f4408" stroke-width="1.5"/>
+      <text x="620" y="142" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#8f4408">firing</text>
+      <rect x="740" y="124" width="180" height="26" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="830" y="142" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#2e7d4f">resolved</text>
+
+      <path d="M270 156 L270 182" fill="none" stroke="#585f6b" stroke-width="1.2" marker-end="url(#ch07-fig2-y1)"/>
+      <text x="282" y="178" font-size="11.5" fill="#585f6b">2분을 못 채우고 사라짐 — 알림 없음</text>
+
+      <path d="M500 156 L500 214" fill="none" stroke="#8f4408" stroke-width="1.2" marker-end="url(#ch07-fig2-y2)"/>
+      <text x="512" y="210" font-size="11.5" fill="#8f4408">2분을 버텼다 — 이 시점에 Alertmanager로 전달</text>
+
+      <line x1="24" y1="248" x2="936" y2="248" stroke="#d8dbe0" stroke-width="1"/>
+      <text x="24" y="274" font-size="12.5" fill="#15181d">for 값이 짧으면 노이즈가, 길면 발견이 늦어진다 — 지표의 변동성을 보고 정한다</text>
+
+      <defs>
+        <marker id="ch07-fig2-y1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#585f6b"/>
+        </marker>
+        <marker id="ch07-fig2-y2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#8f4408"/>
+        </marker>
+      </defs>
+    </svg></div></div><div class="key">규칙을 만든 직후 프로메테우스 /alerts 화면에서 pending 을 확인한다 - 규칙이 동작하는지 아는 가장 빠른 방법이다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">07 · 대시보드와 알림</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide sec">
+<div class="slide-inner sec"><div class="cnum">08</div><h1>로그 수집 — Loki + Alloy</h1><div class="sub"><span>08-01</span>파드가 사라지면 로그도 사라진다<br><span>08-02</span>검색하면 나오는 두 가지를 쓰지 않는다<br><span>08-03</span>로키는 본문을 인덱싱하지 않는다<br><span>08-04</span>라벨로 먼저 좁히고 문자열로 거른다<br></div></div>
+<div class="slide-footer"><span class="slide-footer-left">SECTION 08</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">08 · 로그 수집 — Loki + Alloy</div><h2>파드가 사라지면 로그도 사라진다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" role="img" aria-label="애플리케이션 표준 출력에서 Alloy를 거쳐 로키에 저장되고 그라파나가 조회하는 경로">
+      <rect width="960" height="300" fill="#ffffff"/>
+
+      <rect x="24" y="60" width="200" height="90" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="40" y="88" font-size="13.5" fill="#15181d">애플리케이션</text>
+      <text x="40" y="112" font-size="11.5" fill="#585f6b">표준 출력에 로그를 쓴다</text>
+      <text x="40" y="132" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">System.out / Logback</text>
+
+      <path d="M226 105 L286 105" fill="none" stroke="#585f6b" stroke-width="1.5" marker-end="url(#ch08-fig2-k1)"/>
+
+      <rect x="288" y="60" width="200" height="90" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="304" y="88" font-size="13.5" fill="#15181d">컨테이너 런타임</text>
+      <text x="304" y="112" font-size="11.5" fill="#585f6b">노드 디스크에 파일로 보관</text>
+      <text x="304" y="132" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">/var/log/pods/...</text>
+
+      <path d="M490 105 L550 105" fill="none" stroke="#b4621a" stroke-width="1.5" marker-end="url(#ch08-fig2-k2)"/>
+
+      <rect x="552" y="60" width="200" height="90" fill="#ffffff" stroke="#b4621a" stroke-width="1.5"/>
+      <text x="568" y="88" font-size="13.5" fill="#15181d">Alloy</text>
+      <text x="568" y="112" font-size="11.5" fill="#585f6b">DaemonSet · 노드마다 1개</text>
+      <text x="568" y="132" font-size="11.5" fill="#585f6b">라벨을 붙여 밀어 넣는다</text>
+
+      <path d="M754 105 L814 105" fill="none" stroke="#b4621a" stroke-width="1.5" marker-end="url(#ch08-fig2-k2)"/>
+
+      <rect x="816" y="60" width="120" height="90" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="876" y="98" text-anchor="middle" font-size="13.5" fill="#15181d">Loki</text>
+      <text x="876" y="120" text-anchor="middle" font-size="11.5" fill="#585f6b">단일 바이너리</text>
+      <text x="876" y="138" text-anchor="middle" font-size="11.5" fill="#585f6b">파일시스템 저장</text>
+
+      <rect x="552" y="196" width="384" height="64" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="568" y="222" font-size="13.5" fill="#15181d">Grafana</text>
+      <text x="568" y="244" font-size="11.5" fill="#585f6b">LogQL로 조회 — 프로메테우스와 같은 화면에서</text>
+
+      <path d="M876 152 L876 194" fill="none" stroke="#1f4d8f" stroke-width="1.5" marker-end="url(#ch08-fig2-k3)"/>
+
+      <text x="24" y="222" font-size="12.5" fill="#15181d">애플리케이션은 로그를</text>
+      <text x="24" y="244" font-size="12.5" fill="#15181d">어디로도 보내지 않는다</text>
+      <text x="24" y="268" font-size="12" fill="#585f6b">메트릭과 같은 원칙이다</text>
+
+      <defs>
+        <marker id="ch08-fig2-k1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#585f6b"/>
+        </marker>
+        <marker id="ch08-fig2-k2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#b4621a"/>
+        </marker>
+        <marker id="ch08-fig2-k3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#1f4d8f"/>
+        </marker>
+      </defs>
+    </svg><div class="fig-cap">애플리케이션 코드는 한 줄도 바뀌지 않는다 — 표준 출력에만 쓰면 된다</div></div></div><div class="key">사고를 조사할 때 필요한 로그가 대개 이미 사라진 로그다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">08 · 로그 수집 — Loki + Alloy</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">08 · 로그 수집 — Loki + Alloy</div><h2>검색하면 나오는 두 가지를 쓰지 않는다</h2><div class="body"><table>
+<thead><tr><th>검색하면 나오는 것</th><th>문제</th><th>대신 쓰는 것</th></tr></thead>
+<tbody>
+<tr><td>Promtail</td><td>2026-03-02 EOL. 설정 형식이 Alloy 와 완전히 다르다</td><td>Grafana Alloy</td></tr>
+<tr><td>loki-stack 차트</td><td>차트가 2026-03-16 부로 저장소를 옮겼다</td><td>grafana-community/loki</td></tr>
+<tr><td>grafana 저장소</td><td>grafana/loki 경로로는 원하는 차트를 못 받는다</td><td>grafana-community</td></tr>
+</tbody>
+</table></div><div class="key">Promtail 은 2026-03-02 EOL. 저장소는 grafana 가 아니라 grafana-community</div></div>
+<div class="slide-footer"><span class="slide-footer-left">08 · 로그 수집 — Loki + Alloy</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">08 · 로그 수집 — Loki + Alloy</div><h2>로키는 본문을 인덱싱하지 않는다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 320" role="img" aria-label="로키가 라벨만 색인하고 로그 본문은 압축 저장하는 구조">
+      <rect width="960" height="320" fill="#ffffff"/>
+
+      <text x="24" y="36" font-size="13.5" fill="#15181d">로그 한 줄이 저장되는 방식</text>
+
+      <!-- 라벨 부분 -->
+      <rect x="24" y="58" width="330" height="112" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="40" y="84" font-size="13" fill="#1f4d8f">라벨 — 색인된다</text>
+      <text x="40" y="110" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">namespace="apps"</text>
+      <text x="40" y="130" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">pod="order-api-6b8f..."</text>
+      <text x="40" y="150" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">container="order-api"</text>
+
+      <rect x="374" y="58" width="562" height="112" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="390" y="84" font-size="13" fill="#15181d">로그 본문 — 압축만 된다</text>
+      <text x="390" y="112" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">2026-08-19 14:22:07.113 ERROR 1 --- [nio-8080-exec-3]</text>
+      <text x="390" y="132" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">c.s.o.controller.ChaosController : 의도적 실패 발생</text>
+      <text x="390" y="156" font-size="11.5" fill="#8f4408">색인이 없으므로 본문 검색은 "훑기"다 — 범위를 좁힐수록 빨라진다</text>
+
+      <line x1="24" y1="200" x2="936" y2="200" stroke="#d8dbe0" stroke-width="1"/>
+
+      <text x="24" y="228" font-size="13" fill="#15181d">따라오는 결론 두 가지</text>
+      <text x="40" y="256" font-size="12.5" fill="#15181d">① 라벨은 적게 — 라벨 조합 하나가 곧 하나의 스트림이고, 늘어나면 비용이 폭증한다</text>
+      <text x="40" y="280" font-size="12.5" fill="#15181d">② 질의는 항상 라벨로 시작 — <tspan font-family="ui-monospace,monospace" font-size="11.5">{namespace="apps"}</tspan> 로 좁힌 뒤에 본문을 훑는다</text>
+      <text x="40" y="304" font-size="12" fill="#8f4408">라벨에 요청 ID나 사용자 ID를 넣는 순간 로키는 감당하지 못한다</text>
+    </svg><div class="fig-cap">프로메테우스의 카디널리티 문제와 정확히 같은 구조다</div></div></div><div class="key">라벨을 많이 붙일수록 비용이 급격히 는다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">08 · 로그 수집 — Loki + Alloy</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">08 · 로그 수집 — Loki + Alloy</div><h2>라벨로 먼저 좁히고 문자열로 거른다</h2><div class="body"><pre><span class="dim"># 라벨로 먼저 좁히고, 좁혀진 스트림 안에서 문자열로 거른다</span>
+{namespace="apps", app="order-api"} |= "ERROR"
+
+<span class="dim"># 순서를 뒤집으면 — 라벨 없이 전체에서 문자열을 찾으면 느리다</span>
+{namespace=~".+"} |= "ERROR"<span class="dim">        # 하지 않는다</span></pre></div><div class="key">순서를 뒤집으면 느리다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">08 · 로그 수집 — Loki + Alloy</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide sec">
+<div class="slide-inner sec"><div class="cnum">09</div><h1>운영과 모범 사례</h1><div class="sub"><span>09-01</span>지금 설정은 노트북용이다<br><span>09-02</span>프로메테우스를 죽이는 것은 트래픽이 아니다<br><span>09-03</span>느낌으로는 못 고친다<br><span>09-04</span>간격·보존·디스크는 한 덩어리<br></div></div>
+<div class="slide-footer"><span class="slide-footer-left">SECTION 09</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">09 · 운영과 모범 사례</div><h2>지금 설정은 노트북용이다</h2><div class="body"><table>
+<thead><tr><th>조절 손잡이</th><th>효과</th><th>주의</th></tr></thead>
+<tbody>
+<tr><td>scrapeInterval 30s → 60s</td><td>샘플 수 절반</td><td>rate() 윈도도 함께 늘려야 한다 (간격의 4배 이상)</td></tr>
+<tr><td>retention 단축</td><td>디스크 선형 감소</td><td>주간 비교 · 용량 추세 분석이 불가능해진다</td></tr>
+<tr><td>metricRelabelings 드롭</td><td>디스크 · 메모리 모두 감소</td><td>되돌릴 수 없다</td></tr>
+<tr><td>retentionSize 지정</td><td>디스크 상한 보장</td><td>기간보다 먼저 걸리면 오래된 데이터가 조용히 사라진다</td></tr>
+</tbody>
+</table></div><div class="key">보존 짧고 복제본 없고 인증 열려 있고 제한이 헐겁다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">09 · 운영과 모범 사례</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">09 · 운영과 모범 사례</div><h2>프로메테우스를 죽이는 것은 트래픽이 아니다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 340" role="img" aria-label="메트릭 하나가 라벨 조합의 곱만큼 시계열로 늘어나는 구조">
+      <rect width="960" height="340" fill="#ffffff"/>
+
+      <text x="24" y="36" font-family="ui-monospace,monospace" font-size="12.5" fill="#15181d">http_server_requests_seconds_bucket</text>
+
+      <rect x="24" y="58" width="150" height="62" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="99" y="84" text-anchor="middle" font-size="12" fill="#15181d">엔드포인트</text>
+      <text x="99" y="104" text-anchor="middle" font-family="ui-monospace,monospace" font-size="13" fill="#15181d">12</text>
+
+      <text x="186" y="96" text-anchor="middle" font-size="15" fill="#585f6b">×</text>
+
+      <rect x="200" y="58" width="150" height="62" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="275" y="84" text-anchor="middle" font-size="12" fill="#15181d">상태 코드</text>
+      <text x="275" y="104" text-anchor="middle" font-family="ui-monospace,monospace" font-size="13" fill="#15181d">5</text>
+
+      <text x="362" y="96" text-anchor="middle" font-size="15" fill="#585f6b">×</text>
+
+      <rect x="376" y="58" width="150" height="62" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="451" y="84" text-anchor="middle" font-size="12" fill="#15181d">버킷 수</text>
+      <text x="451" y="104" text-anchor="middle" font-family="ui-monospace,monospace" font-size="13" fill="#15181d">20</text>
+
+      <text x="538" y="96" text-anchor="middle" font-size="15" fill="#585f6b">×</text>
+
+      <rect x="552" y="58" width="150" height="62" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="627" y="84" text-anchor="middle" font-size="12" fill="#15181d">파드 수</text>
+      <text x="627" y="104" text-anchor="middle" font-family="ui-monospace,monospace" font-size="13" fill="#15181d">3</text>
+
+      <text x="714" y="96" text-anchor="middle" font-size="15" fill="#585f6b">=</text>
+
+      <rect x="730" y="58" width="206" height="62" fill="#ffffff" stroke="#1f4d8f" stroke-width="1.5"/>
+      <text x="833" y="84" text-anchor="middle" font-size="12" fill="#15181d">시계열</text>
+      <text x="833" y="106" text-anchor="middle" font-family="ui-monospace,monospace" font-size="14" fill="#1f4d8f">3,600</text>
+
+      <line x1="24" y1="150" x2="936" y2="150" stroke="#d8dbe0" stroke-width="1"/>
+
+      <text x="24" y="180" font-size="13" fill="#8f4408">여기에 라벨을 하나만 잘못 추가하면</text>
+
+      <rect x="24" y="198" width="150" height="62" fill="#ffffff" stroke="#8f4408" stroke-width="1.5"/>
+      <text x="99" y="224" text-anchor="middle" font-size="12" fill="#15181d">주문 ID</text>
+      <text x="99" y="244" text-anchor="middle" font-family="ui-monospace,monospace" font-size="13" fill="#8f4408">50,000</text>
+
+      <text x="186" y="236" text-anchor="middle" font-size="15" fill="#585f6b">×</text>
+
+      <rect x="200" y="198" width="326" height="62" fill="#f5f6f7" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="363" y="234" text-anchor="middle" font-size="12.5" fill="#15181d">위의 조합 3,600</text>
+
+      <text x="538" y="236" text-anchor="middle" font-size="15" fill="#585f6b">=</text>
+
+      <rect x="552" y="198" width="384" height="62" fill="#ffffff" stroke="#8f4408" stroke-width="1.5"/>
+      <text x="744" y="226" text-anchor="middle" font-family="ui-monospace,monospace" font-size="14" fill="#8f4408">180,000,000</text>
+      <text x="744" y="248" text-anchor="middle" font-size="11.5" fill="#585f6b">프로메테우스는 OOM으로 죽는다</text>
+
+      <text x="24" y="296" font-size="12.5" fill="#15181d">라벨 값이 유한한지 스스로 묻는 것 — 계측 코드 리뷰에서 가장 중요한 질문</text>
+      <text x="24" y="320" font-size="12" fill="#585f6b">사용자 ID · 요청 ID · 이메일 · 전체 URL · 타임스탬프는 절대 라벨이 될 수 없다</text>
+    </svg><div class="fig-cap">uri 가 /api/orders/{id} 로 찍히게 한 것이 이 사고를 막는다</div></div></div><div class="key">라벨에 사용자 ID 나 URL 이 들어가면 수만 개로 는다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">09 · 운영과 모범 사례</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">09 · 운영과 모범 사례</div><h2>느낌으로는 못 고친다</h2><div class="body"><pre><span class="dim"># ① 시계열을 가장 많이 차지하는 메트릭 10개</span>
+topk(10, count by (__name__) ({__name__=~".+"}))
+
+<span class="dim"># ② 특정 라벨이 몇 종류의 값을 갖는지 — 계속 늘면 위험 신호</span>
+count(count by (uri) (http_server_requests_seconds_count))
+
+<span class="dim"># ③ 스크레이프 대상별 시계열 수</span>
+topk(10, count by (job, instance) ({__name__=~".+"}))</pre></div><div class="key">현재 시계열 수를 먼저 숫자로 만든다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">09 · 운영과 모범 사례</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">09 · 운영과 모범 사례</div><h2>간격·보존·디스크는 한 덩어리</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 320" role="img" aria-label="스크레이프 간격, 보존 기간, 디스크 용량 세 꼭짓점의 삼각형">
+  <rect width="960" height="320" fill="#ffffff"/>
+  <polygon points="480,60 250,250 710,250" fill="none" stroke="#585f6b" stroke-width="1.8"/>
+  <text x="480" y="46" font-family="ui-monospace,monospace" font-size="16" fill="#15181d" text-anchor="middle" font-weight="600">스크레이프 간격</text>
+  <text x="480" y="24" font-family="ui-monospace,monospace" font-size="14" fill="#1a4fa0" text-anchor="middle" font-weight="400">15s ~ 60s</text>
+  <text x="240" y="276" font-family="ui-monospace,monospace" font-size="16" fill="#15181d" text-anchor="end" font-weight="600">보존 기간</text>
+  <text x="240" y="298" font-family="ui-monospace,monospace" font-size="14" fill="#1a4fa0" text-anchor="end" font-weight="400">3d ~ 30d</text>
+  <text x="720" y="276" font-family="ui-monospace,monospace" font-size="16" fill="#15181d" text-anchor="start" font-weight="600">디스크</text>
+  <text x="720" y="298" font-family="ui-monospace,monospace" font-size="14" fill="#1a4fa0" text-anchor="start" font-weight="400">10Gi ~ 200Gi</text>
+  <rect x="360" y="140" width="240" height="62" rx="0" fill="#f5f6f7" stroke="#1a4fa0" stroke-width="1.5"/>
+  <text x="480" y="168" font-family="ui-monospace,monospace" font-size="15" fill="#15181d" text-anchor="middle" font-weight="400">둘을 정하면</text>
+  <text x="480" y="190" font-family="ui-monospace,monospace" font-size="15" fill="#1a4fa0" text-anchor="middle" font-weight="400">나머지 하나가 결정된다</text>
+</svg></div></div><div class="key">무엇을 포기할지 먼저 정하고 숫자를 넣는다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">09 · 운영과 모범 사례</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide sec">
+<div class="slide-inner sec"><div class="cnum">10</div><h1>테스팅과 카오스 실험</h1><div class="sub"><span>10-01</span>쓸모 있는지 아는 유일한 방법<br><span>10-02</span>게임 데이 네 단계<br><span>10-03</span>폭발 반경 최소화<br><span>10-04</span>책과 달라진 것<br><span>10-05</span>설치 성공과 동작함은 다르다<br><span>10-06</span>주입한 지연 600ms, 알림은 3분 뒤<br><span>10-07</span>안전장치를 빼면 가설이 기각된다<br><span>10-08</span>기각도 실험 성공이다<br></div></div>
+<div class="slide-footer"><span class="slide-footer-left">SECTION 10</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">10 · 테스팅과 카오스 실험</div><h2>쓸모 있는지 아는 유일한 방법</h2><div class="body"><div class="lead wide">쓸모 있는지 아는 유일한 방법은<br><b>이상을 일부러 만드는 것</b><div style="font-size:24px;color:var(--muted);margin-top:22px;line-height:1.6">지연 주입 · 파드 킬 · 에러 강제 — 세 가지를 차례로 넣는다</div></div></div><div class="key">07장 알림이 우는지, 05장 대시보드가 보여 주는지 판정한다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">10 · 테스팅과 카오스 실험</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">10 · 테스팅과 카오스 실험</div><h2>게임 데이 네 단계</h2><div class="body"><table class="dense">
+<thead><tr><th>칸</th><th>무엇을 적나</th><th>예</th></tr></thead>
+<tbody>
+<tr><td>폭발 반경</td><td>영향을 받을 수 있는 최대 범위</td><td>apps 네임스페이스의 order-api 파드 1개</td></tr>
+<tr><td>중단 조건</td><td>여기 닿으면 즉시 실험을 멈춘다</td><td>gateway 5xx 가 20% 를 넘으면</td></tr>
+<tr><td>1. 정상 상태 가설</td><td>무엇이 변하지 않아야 성공인가</td><td>gateway P95 ≤ 120ms, 5xx ≤ 0.5%</td></tr>
+<tr><td>2. 주입할 이벤트</td><td>무엇을 어떻게 얼마나</td><td>PodChaos pod-kill, mode: one</td></tr>
+<tr><td>3. 대조군</td><td>비교 기준이 될 값과 그 출처</td><td>실험 전 30분간의 P95 · 에러율</td></tr>
+<tr><td>4. 판정</td><td>채택인가 기각인가, 근거는 어느 화면인가</td><td>실험 후에만 채운다</td></tr>
+</tbody>
+</table></div><div class="key">실험 후에 가설을 쓰면 게임 데이가 아니라 사후 합리화다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">10 · 테스팅과 카오스 실험</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">10 · 테스팅과 카오스 실험</div><h2>폭발 반경 최소화</h2><div class="body"><div class="lead wide">폭발 반경을 <b>먼저</b> 정한다<div style="font-size:24px;color:var(--muted);margin-top:22px;line-height:1.6">파드 <b>1개</b> · 네임스페이스 <b>하나</b> · <b>5분</b><br><code>duration</code> 을 반드시 넣는다 — 안 넣으면 수동으로 지울 때까지 계속된다</div></div></div><div class="key">라벨로 지우면 매칭되는 파드가 전부 죽는다. 이름을 골라 하나만</div></div>
+<div class="slide-footer"><span class="slide-footer-left">10 · 테스팅과 카오스 실험</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">10 · 테스팅과 카오스 실험</div><h2>책과 달라진 것</h2><div class="body"><table>
+<thead><tr><th>도구</th><th>상태</th><th>이 실습에서</th></tr></thead>
+<tbody>
+<tr><td>Chaos Toolkit (책 5.9.4)</td><td>0.39.0 (2024-04) 이후 릴리스 없음</td><td>쓰지 않는다</td></tr>
+<tr><td>Chaos Mesh</td><td>CNCF 프로젝트. 실험을 CR 로 선언한다</td><td>이것을 쓴다 — 재현성이 여기서 갈린다</td></tr>
+</tbody>
+</table></div><div class="key">Chaos Mesh 를 쓴다. 실험이 CR 로 저장소에 남는다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">10 · 테스팅과 카오스 실험</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">10 · 테스팅과 카오스 실험</div><h2>설치 성공과 동작함은 다르다</h2><div class="body"><div class="lead wide">파드는 Running, 실험은 <b>무반응</b><div style="font-size:24px;color:var(--muted);margin-top:22px;line-height:1.6"><code>chaosDaemon.runtime: containerd</code><br><code>chaosDaemon.socketPath: /run/containerd/containerd.sock</code></div></div></div><div class="key">socketPath 를 빼면 chaos-daemon 이 붙을 소켓이 없다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">10 · 테스팅과 카오스 실험</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">10 · 테스팅과 카오스 실험</div><h2>주입한 지연 600ms, 알림은 3분 뒤</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" role="img" aria-label="지연 주입 실험의 네 시점 타임라인">
+  <rect width="960" height="300" fill="#ffffff"/>
+  <line x1="130" y1="96" x2="900" y2="96" stroke="#585f6b" stroke-width="1.5"/>
+  <circle cx="130" cy="96" r="6" fill="#1a4fa0"/>
+  <text x="130" y="78" font-family="ui-monospace,monospace" font-size="15" fill="#1a4fa0" text-anchor="middle" font-weight="600">0 ~ 1분</text>
+  <text x="124" y="130" font-family="sans-serif" font-size="13" fill="#15181d" text-anchor="start" font-weight="400">대시보드에서 order-api 와 gateway</text>
+  <text x="124" y="150" font-family="sans-serif" font-size="13" fill="#15181d" text-anchor="start" font-weight="400">의 P95 가 올라간다</text>
+  <circle cx="340" cy="96" r="6" fill="#8f4408"/>
+  <text x="340" y="78" font-family="ui-monospace,monospace" font-size="15" fill="#8f4408" text-anchor="middle" font-weight="600">3분경</text>
+  <text x="280" y="130" font-family="sans-serif" font-size="13" fill="#15181d" text-anchor="start" font-weight="400">프로메테우스 Alerts 에서</text>
+  <text x="280" y="150" font-family="sans-serif" font-size="13" fill="#15181d" text-anchor="start" font-weight="400">AppHighLatencyP95 가 …</text>
+  <circle cx="560" cy="96" r="6" fill="#2e7d4f"/>
+  <text x="560" y="78" font-family="ui-monospace,monospace" font-size="15" fill="#2e7d4f" text-anchor="middle" font-weight="600">5분</text>
+  <text x="500" y="130" font-family="sans-serif" font-size="13" fill="#15181d" text-anchor="start" font-weight="400">실험 자동 종료. P95 가 내려온다</text>
+  <circle cx="760" cy="96" r="6" fill="#585f6b"/>
+  <text x="760" y="78" font-family="ui-monospace,monospace" font-size="15" fill="#585f6b" text-anchor="middle" font-weight="600">8분경</text>
+  <text x="700" y="130" font-family="sans-serif" font-size="13" fill="#15181d" text-anchor="start" font-weight="400">알림 resolved</text>
+  <rect x="130" y="176" width="400" height="56" rx="0" fill="#f5f6f7" stroke="#8f4408" stroke-width="1.5"/>
+  <text x="146" y="200" font-family="ui-monospace,monospace" font-size="15" fill="#15181d" text-anchor="start" font-weight="600">주입한 지연 600ms</text>
+  <text x="146" y="222" font-family="ui-monospace,monospace" font-size="14" fill="#8f4408" text-anchor="start" font-weight="400">알림은 3분 뒤 — for: 3m 이 만든 간격</text>
+</svg></div></div><div class="key">그 3분은 for 가 만든 것이다</div></div>
+<div class="slide-footer"><span class="slide-footer-left">10 · 테스팅과 카오스 실험</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">10 · 테스팅과 카오스 실험</div><h2>안전장치를 빼면 가설이 기각된다</h2><div class="body"><div class="lead wide">안전장치를 빼면 <span class="warn">가설이 기각된다</span><div style="font-size:24px;color:var(--muted);margin-top:22px;line-height:1.6">가설: “레플리카가 여러 개면 파드 하나가 죽어도 사용자는 모른다”<br><code>replicas: 1</code> 로 줄이면 그 전제가 사라진다</div></div></div><div class="key">502 · 에러율 100% · AppHighErrorRate 발화</div></div>
+<div class="slide-footer"><span class="slide-footer-left">10 · 테스팅과 카오스 실험</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">10 · 테스팅과 카오스 실험</div><h2>기각도 실험 성공이다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" role="img" aria-label="게임 데이 네 단계와 폭발 반경 최소화">
+      <rect width="960" height="300" fill="#ffffff"/>
+
+      <text x="24" y="26" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">실험 전에 채운다</text>
+      <text x="686" y="26" font-family="ui-monospace,monospace" font-size="11.5" fill="#8f4408">실험 후에 채운다</text>
+      <line x1="24" y1="34" x2="660" y2="34" stroke="#d8dbe0" stroke-width="1"/>
+      <line x1="686" y1="34" x2="936" y2="34" stroke="#8f4408" stroke-width="1"/>
+
+      <rect x="24" y="48" width="196" height="84" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="42" y="72" font-family="ui-monospace,monospace" font-size="13" fill="#15181d">1. 가설</text>
+      <text x="42" y="94" font-size="11.5" fill="#585f6b">무엇이 변하지 않아야</text>
+      <text x="42" y="112" font-size="11.5" fill="#585f6b">성공인가</text>
+
+      <rect x="244" y="48" width="196" height="84" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="262" y="72" font-family="ui-monospace,monospace" font-size="13" fill="#15181d">2. 이벤트</text>
+      <text x="262" y="94" font-size="11.5" fill="#585f6b">무엇을 어떻게</text>
+      <text x="262" y="112" font-size="11.5" fill="#585f6b">얼마나 주입하나</text>
+
+      <rect x="464" y="48" width="196" height="84" fill="#ffffff" stroke="#585f6b" stroke-width="1.5"/>
+      <text x="482" y="72" font-family="ui-monospace,monospace" font-size="13" fill="#15181d">3. 대조군</text>
+      <text x="482" y="94" font-size="11.5" fill="#585f6b">비교 기준이 될 값과</text>
+      <text x="482" y="112" font-size="11.5" fill="#585f6b">그 출처</text>
+
+      <rect x="686" y="48" width="250" height="84" fill="#ffffff" stroke="#8f4408" stroke-width="1.5"/>
+      <text x="706" y="72" font-family="ui-monospace,monospace" font-size="13" fill="#8f4408">4. 판정</text>
+      <text x="706" y="94" font-size="11.5" fill="#585f6b">채택인가 기각인가.</text>
+      <text x="706" y="112" font-size="11.5" fill="#585f6b">근거는 어느 화면인가</text>
+
+      <path d="M220 90 L242 90" fill="none" stroke="#585f6b" stroke-width="1.2"/>
+      <path d="M236 86 L244 90 L236 94 Z" fill="#585f6b"/>
+      <path d="M440 90 L462 90" fill="none" stroke="#585f6b" stroke-width="1.2"/>
+      <path d="M456 86 L464 90 L456 94 Z" fill="#585f6b"/>
+      <path d="M660 90 L684 90" fill="none" stroke="#8f4408" stroke-width="1.2"/>
+      <path d="M678 86 L686 90 L678 94 Z" fill="#8f4408"/>
+
+      <text x="24" y="180" font-family="ui-monospace,monospace" font-size="11.5" fill="#585f6b">폭발 반경 — 첫 실험은 가장 안쪽 하나만</text>
+      <rect x="24" y="194" width="420" height="82" fill="#f5f6f7" stroke="#d8dbe0" stroke-width="1"/>
+      <text x="40" y="214" font-size="11.5" fill="#585f6b">클러스터</text>
+      <rect x="40" y="222" width="320" height="44" fill="#ffffff" stroke="#585f6b" stroke-width="1.2"/>
+      <text x="56" y="240" font-size="11.5" fill="#585f6b">네임스페이스 apps</text>
+      <rect x="56" y="244" width="120" height="16" fill="#ffffff" stroke="#8f4408" stroke-width="1.5"/>
+      <text x="66" y="256" font-family="ui-monospace,monospace" font-size="10" fill="#8f4408">파드 1개 · 5분</text>
+      <rect x="188" y="244" width="120" height="16" fill="#ffffff" stroke="#d8dbe0" stroke-width="1"/>
+      <text x="198" y="256" font-family="ui-monospace,monospace" font-size="10" fill="#585f6b">파드 2 (건드리지 않음)</text>
+
+      <text x="480" y="214" font-size="12" fill="#15181d">라벨로 지우면 매칭되는 파드가 전부 죽는다.</text>
+      <text x="480" y="236" font-size="12" fill="#15181d">이름을 골라 하나만 지운다.</text>
+      <text x="480" y="262" font-family="ui-monospace,monospace" font-size="11.5" fill="#8f4408">mode: one</text>
+    </svg><div class="fig-cap">1~3번은 실험 전에, 4번 판정 칸만 실험 후에 채운다</div></div></div><div class="key">몰랐던 취약점을 장애 전에 찾은 것</div></div>
+<div class="slide-footer"><span class="slide-footer-left">10 · 테스팅과 카오스 실험</span><span class="slide-footer-right"></span></div>
+</section>
+
+<section class="slide">
+<div class="slide-inner"><div class="kicker">마무리</div><h2>00장에서 그린 목표 구조가 <span class="hi">그대로</span> 완성됐다</h2><div class="body"><div class="fig"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" role="img" aria-label="아홉 단계를 거쳐 완성된 관측 스택의 전체 구조">
+      <rect width="960" height="430" fill="#ffffff"/>
+
+      <rect x="16" y="34" width="928" height="380" fill="none" stroke="#9aa1ad" stroke-width="1.5" stroke-dasharray="6 4"/>
+      <text x="32" y="26" font-family="ui-monospace,monospace" font-size="12" fill="#585f6b">kind 클러스터 — 노드 3개 (01장)</text>
+
+      <!-- apps -->
+      <rect x="40" y="60" width="264" height="150" fill="#ffffff" stroke="#15181d" stroke-width="1.5"/>
+      <text x="56" y="84" font-family="ui-monospace,monospace" font-size="12" fill="#585f6b">namespace: apps</text>
+      <rect x="56" y="98" width="232" height="40" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="70" y="123" font-size="12.5" fill="#15181d">gateway · order-api ×2</text>
+      <text x="56" y="160" font-size="11.5" fill="#585f6b">02 계측 · 03 배포</text>
+      <text x="56" y="182" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">/actuator/prometheus</text>
+
+      <!-- monitoring -->
+      <rect x="330" y="60" width="290" height="320" fill="#ffffff" stroke="#15181d" stroke-width="1.5"/>
+      <text x="346" y="84" font-family="ui-monospace,monospace" font-size="12" fill="#585f6b">namespace: monitoring</text>
+      <rect x="346" y="98" width="258" height="38" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="360" y="122" font-size="12.5" fill="#15181d">Prometheus (04)</text>
+      <rect x="346" y="146" width="258" height="38" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="360" y="170" font-size="12.5" fill="#15181d">Alertmanager (07)</text>
+      <rect x="346" y="194" width="258" height="38" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="360" y="218" font-size="12.5" fill="#15181d">Grafana (05)</text>
+      <rect x="346" y="242" width="258" height="38" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="360" y="266" font-size="12.5" fill="#15181d">kube-state-metrics</text>
+      <rect x="346" y="290" width="258" height="38" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="360" y="314" font-size="12.5" fill="#15181d">node-exporter</text>
+      <text x="346" y="356" font-size="11.5" fill="#585f6b">ServiceMonitor · PrometheusRule (06·07)</text>
+
+      <!-- logging -->
+      <rect x="646" y="60" width="264" height="150" fill="#ffffff" stroke="#15181d" stroke-width="1.5"/>
+      <text x="662" y="84" font-family="ui-monospace,monospace" font-size="12" fill="#585f6b">namespace: logging</text>
+      <rect x="662" y="98" width="232" height="38" fill="#ffffff" stroke="#2e7d4f" stroke-width="1.5"/>
+      <text x="676" y="122" font-size="12.5" fill="#15181d">Alloy · Loki (08)</text>
+      <text x="662" y="160" font-size="11.5" fill="#585f6b">Promtail 아님</text>
+      <text x="662" y="182" font-family="ui-monospace,monospace" font-size="11" fill="#585f6b">LogQL</text>
+
+      <!-- 화살표 -->
+      <path d="M344 118 L312 118" fill="none" stroke="#6a4a9c" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#ch09-fig1-o1)"/>
+      <text x="328" y="106" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#6a4a9c">pull</text>
+
+      <path d="M606 214 L648 214 L648 150" fill="none" stroke="#1f4d8f" stroke-width="1.5" marker-end="url(#ch09-fig1-o2)"/>
+      <text x="656" y="234" font-family="ui-monospace,monospace" font-size="10.5" fill="#1f4d8f">LogQL 질의</text>
+
+      <path d="M170 212 L170 404 L778 404 L778 212" fill="none" stroke="#b4621a" stroke-width="1.5" marker-end="url(#ch09-fig1-o3)"/>
+      <text x="186" y="300" font-family="ui-monospace,monospace" font-size="11" fill="#b4621a">파드 로그 수집 → push</text>
+      <text x="186" y="322" font-size="11.5" fill="#585f6b">앱은 표준 출력에만</text>
+
+      <defs>
+        <marker id="ch09-fig1-o1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#6a4a9c"/>
+        </marker>
+        <marker id="ch09-fig1-o2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#1f4d8f"/>
+        </marker>
+        <marker id="ch09-fig1-o3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#b4621a"/>
+        </marker>
+      </defs>
+    </svg></div></div><div class="key">화살표 방향 - 메트릭은 당겨 오고 로그는 밀어 넣는다 - 도 그때 그대로다.</div></div>
+<div class="slide-footer"><span class="slide-footer-left">END</span><span class="slide-footer-right"></span></div>
+</section>
+<div id="prog"></div>
+</div></div>
+<div id="hud"></div>
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide'));
+  var deck=document.getElementById('deck'),prog=document.getElementById('prog'),
+      hud=document.getElementById('hud');
+  var i=0;
+
+  // 페이지 번호는 자동 기입한다 — 장표를 넣고 뺄 때마다 손으로 매기면 어긋난다.
+  slides.forEach(function(s,k){
+    var pg=s.querySelector('.slide-footer-right');
+    if(pg) pg.textContent=(k+1)+' / '+slides.length;
+  });
+
+  function show(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach(function(s,k){s.classList.toggle('on',k===i);});
+    prog.style.width=((i+1)/slides.length*100)+'%';
+    hud.textContent=(i+1)+'/'+slides.length;
+    if(history.replaceState) history.replaceState(null,'','#'+(i+1));
+  }
+  function fit(){
+    deck.style.transform='scale('+Math.min(innerWidth/1280,innerHeight/720)+')';
+  }
+  addEventListener('resize',fit);
+
+  addEventListener('keydown',function(e){
+    var k=e.key;
+    if(k==='ArrowRight'||k==='ArrowDown'||k===' '||k==='PageDown'){e.preventDefault();show(i+1);}
+    else if(k==='ArrowLeft'||k==='ArrowUp'||k==='PageUp'){e.preventDefault();show(i-1);}
+    else if(k==='Home'){show(0);}
+    else if(k==='End'){show(slides.length-1);}
+    else if(k==='f'||k==='F'){document.fullscreenElement?document.exitFullscreen()
+                                                       :document.documentElement.requestFullscreen();}
+    else if(k==='p'||k==='P'){print();}
+  });
+  addEventListener('click',function(e){
+    if(e.target.closest('a')) return;
+    show(e.clientX < innerWidth*0.25 ? i-1 : i+1);
+  });
+
+  addEventListener('hashchange',function(){
+    var h=parseInt((location.hash||'').slice(1),10);
+    if(!isNaN(h) && h-1!==i) show(h-1);
+  });
+
+  var h=parseInt((location.hash||'').slice(1),10);
+  fit(); show(isNaN(h)?0:h-1);
+})();
+</script>
+</body>
+</html>
