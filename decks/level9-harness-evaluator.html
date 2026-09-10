@@ -1758,6 +1758,330 @@ body {
 }
 
 
+/* study — 관측성 스터디 장표 테마
+ *
+ * 정본: docs/ppt/GUIDE.md. 팔레트 6색과 타이포 스케일이 거기서 온다.
+ * 저작 좌표는 1280×720이고 export에서 1.5× 되어 1920×1080이 된다. GUIDE의
+ * 치수는 1920 기준이라 여기서는 전부 ×0.667 한 값을 쓴다 (여백 80→53px 등).
+ *
+ * 폰트는 Pretendard(본문) + JetBrains Mono(코드). 기본값(Inter/system-ui)으로
+ * 수렴하지 않은 이유 — 이 덱은 한글 본문에 영문 식별자(ServiceMonitor,
+ * imagePullPolicy)가 계속 섞인다. Pretendard는 한글 자소 폭이 고르고 라틴
+ * 글리프가 같은 리듬으로 붙어서 그 혼합을 흔들림 없이 받는다. 코드와 출력은
+ * 자릿수 정렬이 판독의 전부라 등폭이 필수다.
+ */
+
+[data-template="study"] {
+  /* GUIDE 팔레트 — 이 여섯 개 밖의 색을 본문에 쓰지 않는다 */
+  --text:    #15181d;  /* 제목 · 본문 */
+  --muted:   #585f6b;  /* 캡션 · 라벨 · 도판의 선 */
+  --border:  #d8dbe0;  /* 표 테두리 · 구분선 */
+  --surface: #f5f6f7;  /* 코드 블록 · 강조 박스 배경 */
+  --accent:  #1a4fa0;  /* 지금 말하는 것 하나 — 장표당 1회 */
+  --warn:    #8f4408;  /* 함정 · 정정 · 실패 */
+  --bg:      #ffffff;
+
+  /* 타이포 스케일 (@1280). GUIDE @1920 값의 ×0.667 */
+  --fs-title: 52px;
+  --fs-lead:  32px;
+  --fs-body:  26px;
+  --fs-code:  24px;
+  --fs-cap:   21px;
+
+  --font-sans: 'Pretendard', 'Pretendard Variable', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* ── 슬라이드 셸 ───────────────────────────────────────────────
+   하단 80px(=GUIDE 120px)은 강의실에서 가려지는 구간이라 비워 둔다.
+   푸터는 그 비워 둔 영역 안에 얹는다 — 가려져도 잃을 것이 없는 정보만. */
+[data-template="study"].slide {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-weight: 400;
+}
+
+[data-template="study"] .slide-inner {
+  position: absolute;
+  inset: 53px 53px 80px;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-template="study"] .slide-footer {
+  position: absolute;
+  left: 53px; right: 53px; bottom: 26px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: var(--fs-cap);
+  color: var(--muted);
+}
+[data-template="study"] .slide-footer-left { font-family: var(--font-sans); }
+[data-template="study"] .slide-footer-right { font-family: var(--font-mono); }
+
+/* ── 제목부 ─────────────────────────────────────────────────── */
+[data-template="study"] .kicker {
+  font-size: var(--fs-cap);
+  color: var(--muted);
+  letter-spacing: .04em;
+  margin-bottom: 10px;
+}
+
+[data-template="study"] h2 {
+  font-size: var(--fs-title);
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -.01em;
+  margin: 0 0 20px;
+}
+
+/* 제목 안에서 딱 한 곳을 강조할 때. 두 곳을 강조하면 어느 쪽도 강조가 아니다. */
+[data-template="study"] h2 .hi { color: var(--accent); }
+[data-template="study"] .warn { color: var(--warn); }
+
+/* ── 본문 ──────────────────────────────────────────────────── */
+[data-template="study"] .body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* 넘치면 제목과 말할 것을 덮는다. 잘라 내면 검사에서 수치로 잡히지만
+     겹치면 스크린샷상 '그럴듯하게' 보여서 놓친다. 그래서 자른다. */
+  overflow: hidden;
+}
+
+/* 텍스트 전용 장표의 주장 문구 */
+[data-template="study"] .lead {
+  font-size: var(--fs-lead);
+  line-height: 1.5;
+  color: var(--text);
+  max-width: 30ch;
+}
+[data-template="study"] .lead.wide { max-width: none; }
+
+/* 좌우 두 칸 */
+[data-template="study"] .cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: start;
+}
+[data-template="study"] .col-head {
+  font-size: var(--fs-cap);
+  color: var(--muted);
+  letter-spacing: .04em;
+  margin-bottom: 8px;
+}
+
+/* ── 도판 ──────────────────────────────────────────────────── */
+[data-template="study"] .fig {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+}
+[data-template="study"] .fig svg {
+  display: block;
+  width: 100%;
+  max-width: 1067px;   /* GUIDE 1600px @1920 */
+  height: auto;
+  max-height: 100%;
+}
+[data-template="study"] .fig img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  /* PNG 5종은 954px 원본이다. 확대하면 뭉개지므로 늘리지 않는다. */
+  width: auto; height: auto;
+}
+[data-template="study"] .fig-cap {
+  font-size: var(--fs-cap);
+  color: var(--muted);
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* ── 표 ───────────────────────────────────────────────────────
+   행을 줄이지 않는다(GUIDE). 안 들어가면 장표를 쪼갠다. */
+[data-template="study"] table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-body);
+  line-height: 1.4;
+}
+[data-template="study"] th,
+[data-template="study"] td {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+[data-template="study"] th {
+  font-size: var(--fs-cap);
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: .03em;
+  border-bottom: 1px solid var(--muted);
+  white-space: nowrap;
+}
+[data-template="study"] tr:last-child td { border-bottom: none; }
+
+/* 행이 많은 표. 행을 줄이는 대신(GUIDE 금지) 여백과 글자를 한 단계 내린다.
+   .dense 는 5행 이상일 때 빌더가 붙인다. */
+[data-template="study"] table.dense { font-size: 23px; }
+[data-template="study"] table.dense th,
+[data-template="study"] table.dense td { padding: 7px 12px; }
+[data-template="study"] table.dense th { font-size: 19px; }
+[data-template="study"] td.num,
+[data-template="study"] td.mono { font-family: var(--font-mono); white-space: nowrap; }
+
+/* 열이 넷 이상이거나 셀이 길어 격자로는 못 읽는 표는 행 카드로 편다.
+   격자를 유지하려고 글자를 22pt 밑으로 내리는 것보다 낫다. */
+[data-template="study"] .cards {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+[data-template="study"] .card {
+  border: 1px solid var(--border);
+  padding: 10px 16px;
+}
+[data-template="study"] .card-h {
+  font-size: 23px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+[data-template="study"] .card-row {
+  display: grid;
+  grid-template-columns: 186px 1fr;
+  gap: 10px;
+  font-size: 20px;
+  line-height: 1.4;
+  padding: 1px 0;
+}
+[data-template="study"] .cards.dense { gap: 7px; }
+[data-template="study"] .cards.dense .card { padding: 8px 14px; }
+[data-template="study"] .cards.dense .card-h { font-size: 21px; }
+[data-template="study"] .cards.dense .card-row { font-size: 19px; line-height: 1.35; }
+
+[data-template="study"] .card-k { color: var(--muted); }
+[data-template="study"] .card-v code,
+[data-template="study"] .card-v .mono { font-family: var(--font-mono); }
+
+/* ── 코드 · 실행 결과 ──────────────────────────────────────────
+   명령과 출력은 다른 블록으로 나눈다. 프롬프트 기호($)는 붙이지 않는다. */
+[data-template="study"] pre {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 18px 22px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-code);
+  line-height: 1.45;
+  white-space: pre;
+  overflow: hidden;
+  margin: 0;
+}
+[data-template="study"] pre + pre { margin-top: 12px; }
+
+/* 판정 줄에만 강조색이 간다. 나머지 출력은 본문색 그대로. */
+[data-template="study"] pre .verdict { color: var(--accent); font-weight: 600; }
+[data-template="study"] pre .dim { color: var(--muted); }
+[data-template="study"] pre .bad { color: var(--warn); }
+
+/* 잘라낸 코드임을 표시하는 줄 */
+[data-template="study"] pre .elide { color: var(--muted); }
+
+/* 출력 아래 붙는 판정 문장 */
+[data-template="study"] .verdict-note {
+  font-size: var(--fs-body);
+  line-height: 1.45;
+  margin-top: 14px;
+  padding-left: 14px;
+  border-left: 3px solid var(--accent);
+}
+[data-template="study"] .verdict-note b { color: var(--accent); font-weight: 600; }
+
+/* ── 말할 것 — 장표 하나의 주장 한 문장 ────────────────────────
+   발표자 노트를 옮겨 붙이는 자리가 아니다. 한 문장을 넘기지 않는다. */
+[data-template="study"] .key {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-body);
+  line-height: 1.45;
+  color: var(--text);
+}
+[data-template="study"] .key b { color: var(--accent); font-weight: 600; }
+
+/* ── 표지 · 챕터 타이틀 · 로드맵 ─────────────────────────────────
+   클래스 이름은 단독 실행본(docs/html/observability-study-slides.html)과
+   공유한다. 두 산출물이 같은 CSS 를 쓰므로 한쪽만 고쳐지는 일이 없다. */
+/* .title / .sec 변형은 슬라이드 루트와 `.slide-inner` 양쪽에 붙는다.
+   `.slide-inner` 를 기준으로 쓰면 `data-template` 이 슬라이드에 붙든(에디터)
+   `<html>` 에 붙든(단독 실행본) 같은 셀렉터 하나로 걸린다. */
+[data-template="study"] .slide-inner.title { justify-content: center; }
+[data-template="study"] .slide-inner.title h1 {
+  font-size: 66px; font-weight: 700; line-height: 1.16; letter-spacing: -.03em;
+}
+[data-template="study"] .slide-inner.title .sub {
+  font-size: 30px; color: var(--muted); margin-top: 22px; letter-spacing: .01em;
+}
+[data-template="study"] .slide-inner.title .meta {
+  font-family: var(--font-mono); font-size: 19px; color: var(--muted); margin-top: 44px;
+}
+
+/* 챕터 타이틀 — 큰 번호 + 그 장의 장표 미리보기 */
+[data-template="study"] .slide-inner.sec {
+  justify-content: center; align-items: flex-start;
+}
+[data-template="study"] .slide-inner.sec .cnum {
+  font-family: var(--font-mono); font-size: 120px; font-weight: 700;
+  color: var(--accent); line-height: 1; letter-spacing: -.02em; margin-bottom: 20px;
+}
+[data-template="study"] .slide-inner.sec h1 {
+  font-size: 52px; font-weight: 700; line-height: 1.16; letter-spacing: -.025em;
+}
+[data-template="study"] .slide-inner.sec .sub {
+  font-size: 21px; color: var(--muted); margin-top: 24px;
+  line-height: 1.75; max-width: 1000px;
+}
+[data-template="study"] .slide-inner.sec .sub span {
+  font-family: var(--font-mono); color: var(--muted); margin-right: 10px;
+}
+
+/* 로드맵 — 11개 장의 의존 흐름 */
+[data-template="study"] .roadmap {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; font-size: 19px;
+}
+[data-template="study"] .rm-item {
+  border: 1px solid var(--border); padding: 12px 14px; line-height: 1.4;
+}
+[data-template="study"] .rm-item .n {
+  font-family: var(--font-mono); color: var(--muted);
+  display: block; margin-bottom: 4px; font-size: 17px;
+}
+
+/* 굵기만으로 위계를 만든다 — GUIDE: "위계는 크기·굵기·여백·정렬로 만든다.
+   색·효과로 만들지 않는다." 강조색은 제목의 .hi 와 판정에만 쓴다. */
+[data-template="study"] .lead b { font-weight: 700; }
+[data-template="study"] .lead .d {
+  display: block; font-size: 24px; color: var(--muted);
+  margin-top: 22px; line-height: 1.6;
+}
+[data-template="study"] code {
+  font-family: var(--font-mono); font-size: .9em;
+  background: #15181d0d; padding: 2px 7px; border-radius: 4px;
+}
+[data-template="study"] h3 {
+  font-size: 21px; color: var(--accent); margin: 6px 0 10px; font-weight: 600;
+}
+
+
 /* Page surround follows the deck theme. Set the surface on `html` (not
    `body`) because brewnet-dark's editor-iframe block force-styles `body`
    with !important; `html` carries data-template so var(--bg)/var(--text)
@@ -1828,7 +2152,7 @@ body { background: transparent; font-family: 'Inter', 'Noto Sans KR', system-ui,
     <div>
       <h3>강의 자료</h3>
       <ul style="margin-top:0">
-        <li style="margin:12px 0">GitHub<span class="d"><a href="https://run-ai.kr/learn/carve-harness" target="_blank" rel="noopener noreferrer">run-ai.kr/learn/carve-harness</a><br><a href="https://github.com/claude-code-expert/carve-harness" target="_blank" rel="noopener noreferrer">github.com/claude-code-expert/carve-harness</a></span></li>
+        <li style="margin:12px 0">GitHub 및 링크&nbsp;<span class="d"><a href="https://run-ai.kr/learn/carve-harness" target="_blank" rel="noopener noreferrer">run-ai.kr/learn/carve-harness</a><br><a href="https://github.com/claude-code-expert/carve-harness" target="_blank" rel="noopener noreferrer">github.com/claude-code-expert/carve-harness</a></span></li>
       </ul>
       <h3>커뮤니티&nbsp;</h3>
       <ul style="margin-top:0">
@@ -1885,20 +2209,20 @@ body { background: transparent; font-family: 'Inter', 'Noto Sans KR', system-ui,
 <section class="export-slide" data-index="4">
 <div class="export-stage slide-canvas-host">
 <div class="slide" data-template="harness" data-skin="navy">
-  <div class="slide-inner">
-<div class="kicker">01 · 용어</div>
-  <h2 data-slot="title">먼저, 용어부터</h2>
-  <table>
-    <tbody><tr><th style="width:390px">용어 (풀 네이밍)</th><th>쉬운 설명</th></tr>
-    <tr><td><b>에이전트</b> (Agent)</td><td>챗봇과 달리 스스로 파일을 읽고 명령을 실행하며 여러 단계를 처리하는 AI</td></tr>
-    <tr><td><b>하네스</b> (Harness)</td><td>원뜻은 말(馬)의 마구(고삐·안장). AI를 감싸 규칙·도구·검증을 강제하는 실행 환경</td></tr>
-    <tr><td><b>게이트</b> (Gate)</td><td>다음 단계로 가기 전 반드시 통과해야 하는 검문소 - 예: 리뷰, 테스트</td></tr>
-    <tr><td><b>컨텍스트 윈도우</b> (Context Window)</td><td>AI가 한 번에 기억하는 작업 기억의 크기 - 차면 규칙을 잊는다</td></tr>
-    <tr><td><b>루프</b> (Loop)</td><td>실행 → 확인 → 재실행의 반복 구조 - 남는 게 없으면 ‘반응적’, 실패가 쌓이면 ‘복리’</td></tr>
-    <tr><td><b>프롬프트·컨텍스트·하네스 엔지니어링</b></td><td>질문 다듬기 → 정보 챙겨 주기 → 실행 환경 설계 - 순서대로 발전해 온 3단계 기술</td></tr>
+  <div class="slide-inner" spellcheck="false">
+<div class="kicker" data-block-id="bF0fKdU7x">01 · 용어</div>
+  <h2 data-slot="title" data-block-id="b2fWh4EcB">먼저, 용어부터</h2>
+  <table data-block-id="bhINLXstv" class="">
+    <tbody><tr><th style="width: 390px; position: relative;" spellcheck="false">용어 (풀 네이밍)</th><th spellcheck="false">쉬운 설명</th></tr>
+    <tr><td spellcheck="false"><b>에이전트</b> (Agent)</td><td spellcheck="false">챗봇과 달리 스스로 파일을 읽고 명령을 실행하며 여러 단계를 처리하는 AI</td></tr>
+    <tr><td spellcheck="false"><b>하네스</b> (Harness)</td><td spellcheck="false">원뜻은 말(馬)의 마구(고삐·안장). AI를 감싸 규칙·도구·검증을 강제하는 실행 환경</td></tr>
+    <tr><td spellcheck="false"><b>게이트</b> (Gate)</td><td spellcheck="false">다음 단계로 가기 전 반드시 통과해야 하는 검문소 - 예: 리뷰, 테스트</td></tr>
+    <tr><td spellcheck="false"><b>컨텍스트 윈도우</b> (Context Window)</td><td spellcheck="false">AI가 한 번에 기억하는 작업 기억의 크기 - 차면 규칙을 잊는다</td></tr>
+    <tr><td spellcheck="false"><b>루프</b> (Loop)</td><td spellcheck="false">실행 → 확인 → 재실행의 반복 구조 - 한바퀴 돌고 남는게 없으면 반응적(소모), 실패가 테스트로 쌓이면 축적(복리)</td></tr>
+    <tr><td spellcheck="false"><b>프롬프트·컨텍스트·하네스 엔지니어링</b></td><td spellcheck="false">질문 다듬기 → 정보 챙겨 주기 → 실행 환경 설계 - 순서대로 발전해 온 3단계 기술</td></tr>
   </tbody></table>
   </div>
-  <div class="slide-footer">
+  <div class="slide-footer" spellcheck="false">
     <span class="slide-footer-left" data-slot="caption">① 바이브 코딩의 한계</span>
     <span class="slide-footer-right" data-slot="page-num">5 / 92</span>
   </div>
@@ -3482,15 +3806,15 @@ API 레이트 리미터 (IP당 분당 60회)
 <div class="kicker" data-block-id="b96izmgZB">04 · 용어</div>
   <h2 data-slot="title" data-block-id="bBeF21cjN">먼저, 용어부터</h2>
   <table class="tight" style="font-size:16px" data-block-id="bbyCKckAX">
-    <tbody><tr><th style="padding-top:3px;padding-bottom:3px;width: 300px; position: relative;" spellcheck="false">용어 (풀 네이밍)</th><th style="padding-top:3px;padding-bottom:3px" spellcheck="false">쉬운 설명</th></tr>
-    <tr><td style="padding-top:3px;padding-bottom:3px" spellcheck="false"><b>Eval</b> (이밸 · Evaluation)</td><td style="padding-top:3px;padding-bottom:3px" spellcheck="false">AI 출력의 품질을 같은 기준으로 반복 채점하는 절차, 그리고 그 점수</td></tr>
-    <tr><td style="padding-top:3px;padding-bottom:3px" spellcheck="false"><b>Evaluator</b> (이밸류에이터)</td><td style="padding-top:3px;padding-bottom:3px" spellcheck="false">만든 쪽과 분리된 ‘채점자’ - 코드·AI·사람 모두 될 수 있다</td></tr>
-    <tr><td style="padding-top:3px;padding-bottom:3px" spellcheck="false"><b>루브릭</b> (Rubric)</td><td style="padding-top:3px;padding-bottom:3px" spellcheck="false">채점표 - ‘무엇이 몇 점인지’를 미리 명문화한 기준</td></tr>
-    <tr><td style="padding-top:3px;padding-bottom:3px" spellcheck="false"><b>LLM-as-Judge</b> (LLM 판사)</td><td style="padding-top:3px;padding-bottom:3px" spellcheck="false">별도의 AI가 루브릭을 들고 다른 AI의 출력을 채점하는 패턴</td></tr>
-    <tr><td style="padding-top:3px;padding-bottom:3px" spellcheck="false"><b>골든셋</b> (Golden Dataset)</td><td style="padding-top:3px;padding-bottom:3px" spellcheck="false">영구 재사용하는 정답지 문제은행 - 실패가 새 문항으로 쌓인다</td></tr>
-    <tr><td style="padding-top:3px;padding-bottom:3px" spellcheck="false"><b>EDD</b> (Evaluation-Driven Development)</td><td style="padding-top:3px;padding-bottom:3px" spellcheck="false">평가 주도 개발 - 감이 아니라 채점 점수로 개발 방향을 결정하는 방식</td></tr>
-    <tr><td style="padding-top:3px;padding-bottom:3px" spellcheck="false"><b>결정론</b> (Deterministic)</td><td style="padding-top:3px;padding-bottom:3px" spellcheck="false">같은 입력이면 언제나 같은 결과 - 테스트·린트처럼 흔들림 없는 검사</td></tr>
-    <tr><td style="padding-top:3px;padding-bottom:3px" spellcheck="false"><b>fail-closed</b> (실패시 차단)</td><td style="padding-top:3px;padding-bottom:3px" spellcheck="false">확인할 수 없으면 통과가 아니라 차단이 기본값 - “모르면 막는다”</td></tr>
+    <tbody><tr><th style="padding-top:3px;padding-bottom:3px;width: 374px; position: relative;" spellcheck="false">용어 (풀 네이밍)</th><th spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 773px;">쉬운 설명</th></tr>
+    <tr><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 374px;"><b>Eval</b> (이밸 · Evaluation)</td><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 773px;">AI 출력의 품질을 같은 기준으로 반복 채점하는 절차, 그리고 그 점수</td></tr>
+    <tr><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 374px;"><b>Evaluator</b> (이밸류에이터)</td><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 773px;">만든 쪽과 분리된 ‘채점자’ - 코드·AI·사람 모두 될 수 있다</td></tr>
+    <tr><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 374px;"><b>루브릭</b> (Rubric)</td><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 773px;">채점표 - ‘무엇이 몇 점인지’를 미리 명문화한 기준</td></tr>
+    <tr><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 374px;"><b>LLM-as-Judge</b> (LLM 판사)</td><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 773px;">별도의 AI가 루브릭을 들고 다른 AI의 출력을 채점하는 패턴</td></tr>
+    <tr><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 374px;"><b>골든셋</b> (Golden Dataset)</td><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 773px;">영구 재사용하는 정답지 문제은행 - 실패가 새 문항으로 쌓인다</td></tr>
+    <tr><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 374px;"><b>EDD</b> (Evaluation-Driven Development)</td><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 773px;">평가 주도 개발 - 감이 아니라 채점 점수로 개발 방향을 결정하는 방식</td></tr>
+    <tr><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 374px;"><b>결정론</b> (Deterministic)</td><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 773px;">같은 입력이면 언제나 같은 결과 - 테스트·린트처럼 흔들림 없는 검사</td></tr>
+    <tr><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 374px;"><b>fail-closed</b> (실패시 차단)</td><td spellcheck="false" style="padding-top:3px;padding-bottom:3px;width: 773px;">확인할 수 없으면 통과가 아니라 차단이 기본값 - “모르면 막는다”</td></tr>
   </tbody></table>
   <div class="key" data-block-id="bndcl9f9Q">이번 파트의 뼈대는 한 줄 - <b>“만드는 쪽과 채점하는 쪽을 나누고, 채점을 숫자로 남긴다”</b></div>
   </div>
@@ -3716,21 +4040,20 @@ API 레이트 리미터 (IP당 분당 60회)
 <section class="export-slide" data-index="65">
 <div class="export-stage slide-canvas-host">
 <div class="slide" data-template="harness" data-skin="navy">
-  <div class="slide-inner">
-<div class="kicker">04 · 결정론 우선</div>
-  <h2 data-slot="title">규칙을 결정론 검사로 번역하기</h2>
-  <table style="margin-top:10px">
-    <tbody><tr><th style="width:50%">팀 규칙 (사람의 문장)</th><th>결정론 검사 (자동 실행)</th></tr>
-    <tr><td>빌드가 깨지지 않는다</td><td>컴파일 + 전체 테스트 자동 실행</td></tr>
-    <tr><td>코드 스타일 통일</td><td>스타일 검사기(린터) 자동 실행</td></tr>
-    <tr><td>화면 계층에서 DB 객체 직접 반환 금지</td><td>구조 검사 도구가 반환 타입을 확인</td></tr>
-    <tr><td>무거운 호출은 응답 경로에서 금지</td><td>금지 패턴 검색(grep)으로 확인</td></tr>
-    <tr><td>과거 마이그레이션 파일 수정 금지</td><td>CI가 기존 파일 변경을 감지하면 실패</td></tr>
+  <div class="slide-inner" spellcheck="false">
+<div class="kicker" data-block-id="bt0Wla6ox">04 · 결정론 우선</div>
+  <h2 data-slot="title" data-block-id="baOOe3Nk6">규칙을 결정론 검사로 번역하기</h2>
+  <table style="margin-top:10px" data-block-id="buY3hPw2m">
+    <tbody><tr><th style="width: 50%; position: relative;" spellcheck="false">팀 규칙 (사람의 문장)</th><th spellcheck="false">결정론 검사 (자동 실행)</th></tr>
+    <tr><td spellcheck="false">빌드가 깨지지 않는다</td><td spellcheck="false">컴파일 + 전체 테스트 자동 실행</td></tr>
+    <tr><td spellcheck="false">코드 스타일 통일</td><td spellcheck="false">스타일 검사기(린터) 자동 실행</td></tr>
+    <tr><td spellcheck="false">화면 계층에서 DB 객체 직접 반환 금지</td><td spellcheck="false">구조 검사 도구가 반환 타입을 확인</td></tr>
+    <tr><td spellcheck="false">무거운 호출은 응답 경로에서 금지</td><td spellcheck="false">금지 패턴 검색(grep)으로 확인</td></tr>
+    <tr><td spellcheck="false">과거 마이그레이션 파일 수정 금지</td><td spellcheck="false">CI가 기존 파일 변경을 감지하면 실패</td></tr>
   </tbody></table>
-  <div class="key">포인트: 팀 관례를 문장이 아니라 <b>결정론 검사로 번역</b>했다 - 사람이 안 봐도 걸린다
-    <span class="d">2장 실험에서 하네스만 막았던 “마이그레이션 수정”이 바로 이 검사다 - 실험에서 발견한 구멍이 실전 검사 규칙이 됐다</span></div>
+  <div class="key" data-block-id="bY5ZI4OBq">포인트: 팀 관례를 문장이 아니라 <b>결정론 검사로 번역</b>했다 - 사람이 안 봐도 걸린다</div>
   </div>
-  <div class="slide-footer">
+  <div class="slide-footer" spellcheck="false">
     <span class="slide-footer-left" data-slot="caption">④ Evaluator 설계</span>
     <span class="slide-footer-right" data-slot="page-num">66 / 92</span>
   </div>
