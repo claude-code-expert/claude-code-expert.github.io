@@ -4868,13 +4868,45 @@ rm -f .eval/attempts; exit 0</pre>
   function updateNav() {
     nav.textContent = (currentIndex() + 1) + ' / ' + slides.length + ' · \u2191 \u2193 · P = Print';
   }
-  function goTo(n) {
+  function goTo(n, behavior) {
     if (n < 0) n = 0;
     if (n > slides.length - 1) n = slides.length - 1;
-    slides[n].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    slides[n].scrollIntoView({ behavior: behavior || 'smooth', block: 'start' });
   }
+
+  // Deep links — ?p=12 / ?slide=12 / ?page=12 / #12 all land on slide 12 (1-based).
+  // The hash is the source of truth: scrolling rewrites it, so the address bar
+  // always holds a shareable link to the slide on screen.
+  function fromQuery() {
+    var m = /[?&](?:p|slide|page)=(\d+)/.exec(window.location.search);
+    return m ? parseInt(m[1], 10) : NaN;
+  }
+  function fromHash() {
+    var h = parseInt((window.location.hash || '').slice(1), 10); // '#print' -> NaN
+    return isNaN(h) ? NaN : h;
+  }
+  var syncedIndex = -1;
+  function writeHash(n) {
+    syncedIndex = n;
+    // Rewrite from pathname so a consumed ?p= is dropped and query/hash cannot disagree.
+    if (window.history.replaceState) {
+      window.history.replaceState(null, '', window.location.pathname + '#' + (n + 1));
+    }
+  }
+  function syncHash() {
+    var n = currentIndex();
+    if (n !== syncedIndex) writeHash(n);
+  }
+
   window.addEventListener('resize', fitAll);
-  window.addEventListener('scroll', updateNav, { passive: true });
+  window.addEventListener('scroll', function(){ updateNav(); syncHash(); }, { passive: true });
+  // Address-bar hash edits and back/forward jump to that slide.
+  // replaceState does not emit hashchange, so syncHash and this never fight.
+  window.addEventListener('hashchange', function(){
+    var n = fromHash();
+    // 'auto' — a typed-in hash is a jump, not a walk through 30 intervening slides.
+    if (!isNaN(n) && n - 1 !== currentIndex()) { syncedIndex = n - 1; goTo(n - 1, 'auto'); updateNav(); }
+  });
   window.addEventListener('keydown', function(e){
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); goTo(currentIndex() + 1); }
     else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goTo(currentIndex() - 1); }
@@ -4884,6 +4916,18 @@ rm -f .eval/attempts; exit 0</pre>
   });
   fitAll();
   updateNav();
+
+  var start = fromHash();
+  if (isNaN(start)) start = fromQuery();
+  if (!isNaN(start)) {
+    // Jump without animation on load, after layout settles.
+    setTimeout(function(){
+      goTo(start - 1, 'auto');
+      updateNav();
+      writeHash(currentIndex()); // normalizes ?p= and out-of-range values into the hash
+    }, 0);
+  }
+
   if (window.location.hash === '#print') {
     // Give fonts/layout a tick to settle before invoking the print dialog.
     setTimeout(function(){ window.print(); }, 300);
